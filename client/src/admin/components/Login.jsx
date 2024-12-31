@@ -74,6 +74,10 @@ const AdminLogin = () => {
       console.log('Backend response:', response?.data);
 
       if (response?.data?.success) {
+        const { token, user } = response.data;
+
+        localStorage.setItem('adminToken', token); // Save the token
+        localStorage.setItem('userRole', user.role);
         dispatch(loginSuccess({ user: response.data.user, token: response.data.token }));
         toast.success('Admin login successful');
       } else {
@@ -87,15 +91,23 @@ const AdminLogin = () => {
     }
   };
 
-useEffect(() => {
-  if (!token) return; // Exit early if token is not present
-
-  const role = localStorage.getItem('userRole');
-  if (role === 'admin') {
-    console.log('Navigating to admin dashboard');
-    navigate('/admin/products/list', { replace: true }); // Use `replace` to avoid history stack growth
-  }
-}, [token, navigate]);
+  useEffect(() => {
+    if (!token) return; // Exit early if token is not present
+  
+    const role = localStorage.getItem('userRole');
+    if (role === 'admin') {
+      console.log('Navigating to admin dashboard');
+      navigate('/admin/products/list', { replace: true }); // Use `replace` to avoid history stack growth
+    }
+  }, [token, navigate]);
+  useEffect(() => {
+    const storedToken = localStorage.getItem('adminToken');
+    const storedRole = localStorage.getItem('userRole');
+    if (storedToken) {
+      dispatch(loginSuccess({ token: storedToken, user: { role: storedRole } }));
+    }
+  }, [dispatch]);
+  
 
 
   return (

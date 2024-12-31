@@ -99,6 +99,12 @@ const Sidebar = () => {
           <Icon src={assets.order_icon} alt="Category Icon" />
           <NavText>Category</NavText>
         </NavLinkStyled>
+
+          {/* Stock */}
+          <NavLinkStyled to="/admin/products/stock/:id">
+          <Icon src={assets.order_icon} alt="Category Icon" />
+          <NavText>Stock</NavText>
+        </NavLinkStyled>
       </NavItems>
     </SidebarContainer>
   );
