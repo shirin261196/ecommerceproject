@@ -1,64 +1,64 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchProducts, selectFilteredProducts } from '../../redux/slices/productSlice';
-import { assets } from '../../assets/assets';
+import { fetchProducts, selectFilteredProducts, updateProductStock } from '../../redux/slices/productSlice';
+import { fetchCategories } from '../../redux/slices/categorySlice';
 import Title from '../components/Title';
 import ProductItem from '../components/ProductItem';
-import { backendUrl } from '../../App';
-import axios from 'axios';
+import { ShopContext } from '../../context/ShopContext';
 
 const Collection = () => {
   const dispatch = useDispatch();
+  const { search } = useContext(ShopContext);
 
-  // Use selectors for products and loading state
-  const products  = useSelector(selectFilteredProducts);
+  // State management
+  const products = useSelector(selectFilteredProducts);
   const isLoading = useSelector((state) => state.products.loading);
+  const categories = useSelector((state) => state.categories.categories);
+  const categoriesLoading = useSelector((state) => state.categories.loading);
 
-  const [showFilter, setShowFilter] = useState(true);
-  const [categories, setCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [sortType, setSortType] = useState('relevant');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
 
-  // Fetch products on component mount
+  // Fetch products and categories on mount
   useEffect(() => {
-    if (products.length === 0) {
-      dispatch(fetchProducts());
-    }
-  }, [dispatch, products]);
+    dispatch(fetchProducts()); // Load products via Redux action
+   
+    dispatch(fetchCategories()); // Load categories via Redux action
+  }, [dispatch]);
 
-    // Fetch active categories on component mount
-    useEffect(() => {
-      const fetchActiveCategories = async () => {
-          try {
-              const response = await axios.get(`${backendUrl}/admin/category/active`);
-              if (response.data.success) {
-                  setCategories(response.data.data);
-              } else {
-                  console.error(response.data.message);
-              }
-          } catch (error) {
-              console.error('Failed to fetch categories');
-          }
-      };
-
-      fetchActiveCategories();
-  }, []);
-
-     // Filter and sort products
-     const filteredProducts = products.filter((item) =>
-      selectedCategories.length > 0 ? selectedCategories.includes(item.category) : true
+  // Filter products by selected categories
+  const filteredProducts = products.filter((item) =>
+    selectedCategories.length > 0 ? selectedCategories.includes(item.category) : true
   );
 
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
+  // Further filter products by search input
+  const searchedProducts = filteredProducts.filter((item) =>
+    item.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Sort products based on selected criteria
+  const sortedProducts = [...searchedProducts].sort((a, b) => {
     switch (sortType) {
       case 'low-to-high':
         return a.price - b.price;
       case 'high-to-low':
         return b.price - a.price;
+      case 'popularity':
+        return b.popularity - a.popularity;
+      case 'average-ratings':
+        return b.averageRating - a.averageRating;
+      case 'featured':
+        return b.isFeatured ? -1 : 1;
+      case 'new-arrivals':
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      case 'a-z':
+        return a.name.localeCompare(b.name);
+      case 'z-a':
+        return b.name.localeCompare(a.name);
       default:
-        return 0; // Default order (relevant)
+        return 0; // Default sorting (relevant)
     }
   });
 
@@ -76,52 +76,45 @@ const Collection = () => {
   const toggleCategory = (e) => {
     const value = e.target.value;
     setSelectedCategories((prev) =>
-        prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
     );
-};
+  };
 
   return (
     <div className="container py-4">
       <div className="row">
-        {/* Filter Options */}
+        {/* Sidebar: Filter Options */}
         <div className="col-12 col-md-3 mb-4">
           <div>
-            <p
-              className="d-flex align-items-center cursor-pointer fw-bold mb-2"
-              onClick={() => setShowFilter(!showFilter)}
-            >
-              FILTERS
-              <img
-                className={`ms-2 ${showFilter ? 'rotate-90' : ''}`}
-                src={assets.dropdown_icon}
-                alt="Toggle Filters"
-                style={{ height: '10px' }}
-              />
-            </p>
+            <p className="fw-bold mb-2">FILTERS</p>
 
             {/* Category Filter */}
-            <div className={`border p-3 ${showFilter ? '' : 'd-none'}`}>
-                            <p className="mb-3 fw-semibold">CATEGORIES</p>
-                            <div className="d-flex flex-column gap-2 text-muted">
-                                {categories.map((cat) => (
-                                    <div className="d-flex align-items-center gap-2" key={cat._id}>
-                                        <input
-                                            type="checkbox"
-                                            value={cat.name}
-                                            onChange={toggleCategory}
-                                            className="form-check-input me-2"
-                                        />
-                                        {cat.name}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+            <div className="border p-3">
+              <p className="mb-3 fw-semibold">CATEGORIES</p>
+              {categoriesLoading ? (
+                <p>Loading categories...</p>
+              ) : (
+                <div className="d-flex flex-column gap-2 text-muted">
+                  {categories.map((cat) => (
+                    <div className="form-check" key={cat._id}>
+                      <input
+                        type="checkbox"
+                        value={cat._id}
+                        onChange={toggleCategory}
+                        className="form-check-input"
+                      />
+                      <label className="form-check-label">{cat.name}</label>
                     </div>
+                  ))}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-        {/* Product Listing */}
+        {/* Main Content: Product Listing */}
         <div className="col-12 col-md-9">
-          {/* Header and Sort Option */}
+          {/* Header and Sort Options */}
           <div className="d-flex justify-content-between align-items-center mb-3">
             <Title text1="ALL " text2="COLLECTION" />
             <select
@@ -129,8 +122,14 @@ const Collection = () => {
               className="form-select w-auto"
             >
               <option value="relevant">Sort by: Relevant</option>
-              <option value="low-to-high">Sort by: Low to High</option>
-              <option value="high-to-low">Sort by: High to Low</option>
+              <option value="low-to-high">Price: Low to High</option>
+              <option value="high-to-low">Price: High to Low</option>
+              <option value="popularity">Sort by: Popularity</option>
+              <option value="average-ratings">Average Ratings</option>
+              <option value="featured">Featured</option>
+              <option value="new-arrivals">New Arrivals</option>
+              <option value="a-z">Name: A to Z</option>
+              <option value="z-a">Name: Z to A</option>
             </select>
           </div>
 
@@ -146,6 +145,7 @@ const Collection = () => {
                     id={item._id}
                     price={item.price}
                     stock={item.stock}
+                    sizes={item.sizes}
                     image={imageUrl}
                   />
                 </div>

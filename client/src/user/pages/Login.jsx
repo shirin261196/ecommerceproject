@@ -4,20 +4,37 @@ import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
-import { loginSuccess, selectIsAuthenticated } from "../../redux/slices/authSlice";
+import { loginSuccess, logout, selectIsAuthenticated } from "../../redux/slices/authSlice";
 import Swal from "sweetalert2";
+import {fetchUserProfile} from "../../redux/slices/userSlice";
 
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const isAuthenticated = useSelector(selectIsAuthenticated); // Check if user is already authenticated
-  const backendUrl = "https://9db7-2405-201-f018-f0ba-6cc6-a576-da86-82c4.ngrok-free.app";
+  const backendUrl = "https://150e-2405-201-f018-f0ba-58dd-bc19-a429-898e.ngrok-free.app";
+
+
+  const token = useSelector((state) => state.auth.token);
+console.log("Token in Redux state:", token); // Should print the token
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm();
+
+    // Load token and user on page refresh
+    useEffect(() => {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (token && user) {
+        dispatch(loginSuccess({ token, user }));
+      } else {
+        dispatch(logout());
+      }
+    }, [dispatch]);
+    
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -48,23 +65,34 @@ const Login = () => {
       });
 
       if (result.data.success) {
+        const { token, user } = result.data;
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
         dispatch(loginSuccess({ token: result.data.token, user: result.data.user }));
         toast.success("Google Sign-In successful!");
         navigate("/", { replace: true });
       } else {
-        toast.error(result.data.message || "Google Sign-In failed");
+        toast.error(result.data.message || "Google Sign-In failed or your account is blocked by the admin");
       }
     } catch (error) {
       toast.error("Error during Google Sign-In");
     }
   };
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token");
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    if (storedToken && storedUser) {
+      dispatch(loginSuccess({ token: storedToken, user: storedUser }));
+    }
+  }, [dispatch]);
+  
 
   const onSubmit = async (data) => {
     try {
       const response = await axios.post(`${backendUrl}/login`, data);
-
+  
       console.log("Response from server:", response);
-
+  
       if (response?.status === 403 && response?.data?.userBlocked) {
         Swal.fire({
           icon: "error",
@@ -72,7 +100,14 @@ const Login = () => {
           text: "Your account has been blocked by the admin. Contact support.",
         });
       } else if (response?.data?.success) {
-        dispatch(loginSuccess({ token: response?.data?.token, user: response?.data?.user }));
+        const { token, user } = response.data;
+        localStorage.setItem('token', token); // Store token in localStorage
+        localStorage.setItem('user', JSON.stringify(user)); 
+        console.log(token)
+      
+        dispatch(loginSuccess({ token, user }));
+  
+        dispatch(fetchUserProfile()); // Missing closing bracket was here
         toast.success("Login successful!");
         navigate("/", { replace: true });
       } else {
@@ -80,7 +115,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Caught error:", error);
-
+  
       if (error.response) {
         if (error.response.status === 403 && error.response.data?.userBlocked) {
           Swal.fire({
@@ -96,6 +131,7 @@ const Login = () => {
       }
     }
   };
+  
 
   return (
     <div

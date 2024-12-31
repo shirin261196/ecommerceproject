@@ -15,13 +15,9 @@ const ForgotPassword = () => {
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
   const navigate = useNavigate();
 
-  const isAuthenticated = useSelector(selectIsAuthenticated);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/", { replace: true }); // Redirect to home and replace history
-    }
-  }, [isAuthenticated, navigate]);
+  
+  
 
   useEffect(() => {
     if (timer > 0 && step === 2) {
