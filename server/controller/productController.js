@@ -1,12 +1,26 @@
 import productModel from '../models/productModel.js';
 import pkg from 'cloudinary';
-
+import mongoose from 'mongoose'
 const { v2: cloudinary } = pkg;
+import { body, validationResult } from 'express-validator';
+import Cart from '../models/cartModel.js';
+
+export const getAllProducts = async (req, res, next) => {
+  try {
+    // Populate the 'category' field with category details
+    const products = await productModel.find({ deleted: false }).populate('category'); // This will populate category
+
+    res.json(products); // Send the products as a JSON response
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 // Add Product
 export const addProduct = async (req, res,next) => {
   try {
-    const { name, description, category, subcategory, price, stock, bestseller, sizes } = req.body;
+    const { name, description, category, price,stock,newestArrival,popularity,averageRating, bestseller, sizes } = req.body;
     const date = req.body.date || Date.now();
     const parsedSizes = Array.isArray(sizes) ? sizes : JSON.parse(sizes);
 
@@ -31,7 +45,7 @@ export const addProduct = async (req, res,next) => {
       name,
       description,
       category,
-      subcategory,
+      popularity,averageRating,newestArrival,
       price,
       stock,
       date,
@@ -49,21 +63,30 @@ export const addProduct = async (req, res,next) => {
 };
 
 // List Products
-export const listProducts = async (req, res,next) => {
+export const listProducts = async (req, res, next) => {
   try {
-    const products = await productModel.find();
+    // Populate the 'category' field with category details
+    const products = await productModel.find().populate('category'); // This will populate category
+
     res.json({ success: true, products });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch products' });
+    next(error);
   }
 };
 
 // Get Single Product
-export const getProductById = async (req, res) => {
+export const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const product = await productModel.findById(id);
+    // Validate the id format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product ID' });
+    }
+
+    // Populate the 'category' field with category details
+    const product = await productModel.findById(id).populate('category');
+
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -74,24 +97,35 @@ export const getProductById = async (req, res) => {
   }
 };
 
+
 // Remove Product
-export const deleteProduct = async (req, res,next) => {
+// Soft Delete Product
+export const deleteProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
+
     const product = await productModel.findByIdAndUpdate(
       id,
       { deleted: true },
+      { new: true } // Return the updated product
     );
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    res.json({ success: true, message: 'Product deleted successfully' });
+    // Remove the product from all carts
+    await Cart.updateMany(
+      { 'items.product': id },
+      { $pull: { items: { product: id } } }
+    );
+
+    res.json({ success: true, message: 'Product soft deleted and removed from all carts' });
   } catch (error) {
     next(error);
   }
 };
+
 
 // restore products
 export const restoreProduct = async(req,res,next) =>{
@@ -107,7 +141,7 @@ export const restoreProduct = async(req,res,next) =>{
 
     res.json({ success: true, message: 'Product restored successfully' });
   } catch (err) {
-    next(error);
+    next(err);
   }
 }
 // Update Product
@@ -182,3 +216,33 @@ export const deleteImage = async (req, res,next) => {
     next(error);
   }
 };
+
+// Update stock for a specific product size
+export const updateStock = async (req, res,next) => {
+  const { size, stock } = req.body;
+  const { id } = req.params;
+
+  try {
+    const product = await productModel.findById(id);
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const sizeToUpdate = product.sizes.find((s) => s.size === size);
+
+    if (!sizeToUpdate) {
+      return res.status(404).json({ success: false, message: 'Size not found' });
+    }
+
+    sizeToUpdate.stock = stock; // Update the stock
+
+    await product.save();
+
+    return res.status(200).json({ success: true, message: 'Stock updated successfully' });
+  } catch (error) {
+   next(error)
+  }
+};
+
+

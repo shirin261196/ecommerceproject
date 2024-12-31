@@ -58,13 +58,27 @@ export const editCategory = async (req, res, next) => {
         const { id } = req.params;
         const { name, description } = req.body;
 
-        const categories = await Category.findByIdAndUpdate(
+        // Check if a category with the same name exists (excluding the current category)
+        const existingCategory = await Category.findOne({
+            _id: { $ne: id }, // Exclude the current category by ID
+            name: { $regex: new RegExp(`^${name}$`, "i") }, // Case-insensitive name match
+        });
+
+        if (existingCategory) {
+            return res.status(400).json({
+                success: false,
+                message: 'Category with this name already exists',
+            });
+        }
+
+        // Update the category
+        const category = await Category.findByIdAndUpdate(
             id,
             { name, description },
-            { new: true }
+            { new: true } // Return the updated document
         );
 
-        if (!categories) {
+        if (!category) {
             return res.status(404).json({
                 success: false,
                 message: 'Category not found',
@@ -74,12 +88,13 @@ export const editCategory = async (req, res, next) => {
         res.json({
             success: true,
             message: 'Category updated successfully',
-            data: categories,
+            data: category,
         });
     } catch (error) {
         next(error);
     }
 };
+
 
 // Soft Delete Category
 export const deleteCategory = async (req, res, next) => {

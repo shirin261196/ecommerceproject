@@ -4,12 +4,13 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { sendOtpEmail } from '../emailService.js';
+import mongoose from "mongoose";
 const SECRET_KEY = process.env.JWT_SECRET
 
 
 // Function to create a JWT token
 function generateToken(user) {
-  return jwt.sign({ id: user.id, email: user.email, role: user.role }, SECRET_KEY, { expiresIn: '1h' });
+  return jwt.sign({ id: user._id, email: user.email, role: user.role }, SECRET_KEY, { expiresIn: '24h' });
 }
 // Route for user login
 const loginUser = async (req, res,next) => {
@@ -45,7 +46,7 @@ console.log("Password validation result:", isPasswordValid);
       message: "Login successful",
       token,
       user: {
-        id: user.id,
+        id: user._id,
         name:user.name,
         email: user.email,
         role: user.role,
@@ -226,20 +227,156 @@ const resetPassword = async (req, res,next) => {
 };
 
 // Get User Profile
- const getUserProfile = async (req, res,next) => {
+export const getUserProfile = async (req, res, next) => {
   try {
-      const userId = req.user.id;
+    console.log('req.user:', req.user); // Debug
+    const userId = req.user.id;
+    console.log(userId);
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID not found in request' });
+    }
 
-      const user = await userModel.findById(userId).select('-password');
-      if (!user) {
-          return res.status(404).json({ success: false, message: 'User not found' });
-      }
+    const user = await userModel.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-      res.json({ success: true, user });
+    res.json({ success: true, user });
   } catch (error) {
     next(error);
   }
 };
+
+// Update User Profile
+export const updateUserProfile = async (req, res,next) => {
+  try {
+    const updates = req.body;
+    const user = await userModel.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-password');
+    res.json({ success: true, user });
+  } catch (error) {
+    next(error)
+  }
+};
+
+
+
+// Manage Add Addresses
+// Add Address to User Profile
+export const addAddress = async (req, res, next) => {
+  const { userId, fullname, phone, street, city, state, country, zip } = req.body;
+  console.log('Request Body:', req.body);
+
+  if (!userId || !fullname || !phone || !street || !city || !state || !country || !zip) {
+      return res.status(400).json({ success: false, message: 'All fields are required' });
+  }
+
+  try {
+
+      const user = await userModel.findById(userId);
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      const newAddress = { fullname, phone, street, city, state, country, zip };
+      user.addresses.push(newAddress);
+      await user.save();
+
+      res.status(201).json(newAddress);
+  } catch (error) {
+      next(error);
+  }
+};
+
+
+
+
+
+
+
+//edit address
+export const editAddress = async (req, res, next) => {
+  const { addressId } = req.params;
+  const { fullname, phone, street, city, state, country, zip } = req.body;
+
+  console.log('updatedaddress',req.body)
+
+  if (!fullname || !phone || !street || !city || !state || !country || !zip) {
+    return res.status(400).json({ success: false, message: 'All fields are required' });
+  }
+
+  try {
+    const user = await userModel.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const addressIndex = user.addresses.findIndex((address) => address._id.toString() === addressId);
+    if (addressIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Address not found' });
+    }
+
+    // Update the address while keeping the original `_id`
+    user.addresses[addressIndex] = {
+      ...user.addresses[addressIndex],
+      fullname,
+      phone,
+      street,
+      city,
+      state,
+      country,
+      zip,
+    };
+
+    await user.save();
+
+    res.status(200).json(user.addresses[addressIndex]);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const deleteAddress = async (req, res, next) => {
+  const { addressId } = req.params;
+  const userId = req.user.id; // Get userId from the authenticated user
+
+  try {
+    const user = await userModel.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Find the address to delete
+    const addressIndex = user.addresses.findIndex((address) => address._id.toString() === addressId);
+    if (addressIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Address not found' });
+    }
+
+    // Remove the address from the array
+    user.addresses.splice(addressIndex, 1);
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Address deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+
+
+export const fetchAllAddress = async(req,res,next)=>{
+  const userId = req.user.id;  // Authenticated user ID
+
+  try {
+    const user = await userModel.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+   // Check if the address exists
+   res.status(200).json(user.addresses);
+   
+  } catch (error) {
+    next(error)
+  }}
+
+
+
 
 // Admin login route
 const adminLogin = async (req, res) => {
@@ -276,4 +413,4 @@ const adminLogin = async (req, res) => {
   });
 };
 
-export { loginUser, registerUser, adminLogin, verifyOtp, resendOtp, getUserProfile,forgotPassword,resetPassword };
+export { loginUser, registerUser, adminLogin, verifyOtp, resendOtp,forgotPassword,resetPassword };
