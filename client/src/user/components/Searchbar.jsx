@@ -1,23 +1,20 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { ShopContext } from '../../context/ShopContext';
-import { assets } from '../../assets/assets';
 import { useLocation } from 'react-router-dom';
+import { assets } from '../../assets/assets';
 
 const Searchbar = () => {
   const { search, setSearch, showSearch, setShowSearch } = useContext(ShopContext);
-  const [visible,setVisible] = useState(false)
-  const location =useLocation();
+  const location = useLocation();
+  const [visible, setVisible] = useState(false);
 
-  useEffect(()=>{
-    if(location.pathname.includes('collection')){
-        setVisible(true);
-    }
-    else{
-        setVisible(false)
-    }
-  },[location])
+  useEffect(() => {
+    setVisible(location.pathname.includes('collection'));
+  }, [location]);
 
-  return showSearch && visible ? (
+  if (!showSearch || !visible) return null;
+
+  return (
     <div className="border-top border-bottom bg-light text-center py-2">
       <div className="d-flex align-items-center justify-content-center mx-auto" style={{ maxWidth: '500px' }}>
         <div className="d-flex align-items-center border p-1 flex-grow-1">
@@ -45,7 +42,7 @@ const Searchbar = () => {
         />
       </div>
     </div>
-  ) : null;
+  );
 };
 
 export default Searchbar;
