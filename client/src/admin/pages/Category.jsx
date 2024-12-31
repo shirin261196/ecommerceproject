@@ -4,7 +4,7 @@ import { backendUrl } from '../../App';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { Pagination } from 'react-bootstrap';
 
 const MySwal = withReactContent(Swal);
 
@@ -13,8 +13,9 @@ const CategoryManagement = () => {
     const [newCategory, setNewCategory] = useState({ name: '', description: '' });
     const [editingCategory, setEditingCategory] = useState(null);
     const [editedCategoryData, setEditedCategoryData] = useState({ name: '', description: '' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [categoriesPerPage] = useState(10);
 
-    // Fetch categories from the backend
     const fetchCategories = async () => {
         try {
             const response = await axios.get(`${backendUrl}/admin/category`, {
@@ -30,18 +31,20 @@ const CategoryManagement = () => {
         }
     };
 
-    // Add new category
-    const handleAddCategory = async () => {
+      // Add new category
+      const handleAddCategory = async () => {
         if (categories.some((c) => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
             toast.error('Category with this name already exists');
             return;
         }
         try {
-            const response = await axios.post(
-                `${backendUrl}/admin/category`,
-                newCategory,
-                { headers: { Authorization: `Bearer ${localStorage.getItem('AdminToken')}` } }
-            );
+       
+const response = await axios.post(
+    `${backendUrl}/admin/category`,  
+    newCategory,
+    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
+);
+
             if (response.data.success) {
                 toast.success(response.data.message);
                 fetchCategories();
@@ -70,7 +73,7 @@ const CategoryManagement = () => {
                 const response = await axios.put(
                     `${backendUrl}/admin/category/${id}/delete`,
                     { isDeleted: true },
-                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
+                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
                 );
 
                 if (response.data.success) {
@@ -101,7 +104,7 @@ const CategoryManagement = () => {
                 const response = await axios.put(
                     `${backendUrl}/admin/category/${id}/restore`,
                     { isDeleted: false },
-                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
+                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
                 );
                 if (response.data.success) {
                     toast.success('Category restored successfully');
@@ -121,7 +124,7 @@ const CategoryManagement = () => {
             const response = await axios.put(
                 `${backendUrl}/admin/category/${id}`,
                 editedCategoryData,
-                { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
+                { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
             );
             if (response.data.success) {
                 toast.success(response.data.message);
@@ -138,6 +141,13 @@ const CategoryManagement = () => {
     useEffect(() => {
         fetchCategories();
     }, []);
+
+    // Pagination logic
+    const indexOfLastCategory = currentPage * categoriesPerPage;
+    const indexOfFirstCategory = indexOfLastCategory - categoriesPerPage;
+    const currentCategories = categories.slice(indexOfFirstCategory, indexOfLastCategory);
+
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
         <div className="container">
@@ -184,7 +194,7 @@ const CategoryManagement = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {categories.map((category, index) => (
+                    {currentCategories.map((category, index) => (
                         <tr key={category._id}>
                             <td>{index + 1}</td>
                             <td>
@@ -257,6 +267,15 @@ const CategoryManagement = () => {
                     ))}
                 </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            <Pagination>
+                {[...Array(Math.ceil(categories.length / categoriesPerPage))].map((_, index) => (
+                    <Pagination.Item key={index + 1} active={index + 1 === currentPage} onClick={() => paginate(index + 1)}>
+                        {index + 1}
+                    </Pagination.Item>
+                ))}
+            </Pagination>
         </div>
     );
 };

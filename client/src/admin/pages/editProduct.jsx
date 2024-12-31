@@ -15,10 +15,8 @@ const EditProduct = () => {
     price: '',
     stock: '',
     category: '',
-    subcategory: '',
     description: '',
     sizes: [],
-    date: '',
     bestseller: false,
     images: [],
   });
@@ -26,14 +24,13 @@ const EditProduct = () => {
   const [categories, setCategories] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [imageURLs, setImageURLs] = useState([]);
-  const [cropIndex, setCropIndex] = useState(null); // Index of the image being cropped
-  const cropperRef = useRef(null); // Reference for the Cropper instance
+  const [cropIndex, setCropIndex] = useState(null);
+  const cropperRef = useRef(null);
+  const [sizes, setSizes] = useState([{ size: '', stock: 0 }]);
 
-  // Initialize React Hook Form
   const { register, handleSubmit, setValue, formState: { errors } } = useForm();
 
   useEffect(() => {
-    // Fetch Product Details
     const fetchProduct = async () => {
       try {
         const response = await axios.get(`http://localhost:4000/admin/products/${id}`, {
@@ -42,19 +39,16 @@ const EditProduct = () => {
         const data = response.data.product;
         setProduct({
           ...data,
-          sizes: data.sizes || [],
+          sizes: data.sizes || [{ size: '', stock: 0 }],
           images: data.images || [],
         });
 
-        // Set default values for the form
         setValue('name', data.name);
         setValue('price', data.price);
         setValue('stock', data.stock);
         setValue('category', data.category);
-        setValue('subcategory', data.subcategory);
         setValue('description', data.description);
-        setValue('sizes', data.sizes || []);
-        setValue('date', data.date);
+        setSizes(data.sizes || [{ size: '', stock: 0 }]);
         setValue('bestseller', data.bestseller || false);
       } catch (error) {
         toast.error('Failed to load product details');
@@ -67,11 +61,9 @@ const EditProduct = () => {
     const fetchCategories = async () => {
       try {
         const response = await axios.get('http://localhost:4000/admin/category', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('adminToken')}`, // Use appropriate storage for the token
-          },
+          headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
         });
-        
+
         if (response.data && Array.isArray(response.data.data)) {
           setCategories(response.data.data);
         } else {
@@ -79,14 +71,13 @@ const EditProduct = () => {
         }
       } catch (error) {
         console.error('Failed to fetch categories:', error);
-        setCategories([]); // Fallback to an empty array
+        setCategories([]);
         toast.error('Failed to fetch categories.');
       }
     };
 
     fetchCategories();
   }, []);
-
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -95,28 +86,26 @@ const EditProduct = () => {
     setImageFiles((prev) => [...prev, ...files]);
     setImageURLs((prev) => [...prev, ...fileURLs]);
   };
+
   const openCropper = (index) => {
-    // Destroy any existing cropper instance before initializing a new one
     if (cropperRef.current) {
       cropperRef.current.destroy();
     }
-  
-    setCropIndex(index); // Set the index for the image to crop
-  
+
+    setCropIndex(index);
+
     const cropperImageContainer = document.querySelectorAll('.uploaded-images img')[index];
     if (!cropperImageContainer) {
-      console.error("Unable to find the image element for cropping.");
+      console.error('Unable to find the image element for cropping.');
       return;
     }
-  
-    // Initialize a new Cropper instance
+
     cropperRef.current = new Cropper(cropperImageContainer, {
       aspectRatio: 1,
       viewMode: 2,
       autoCropArea: 0.8,
     });
   };
-  
 
   const handleCrop = () => {
     if (cropperRef.current) {
@@ -128,15 +117,13 @@ const EditProduct = () => {
         const updatedFiles = [...imageFiles];
         updatedFiles[cropIndex] = croppedFile;
         setImageFiles(updatedFiles);
-  
-        // Update the URL for preview
+
         const updatedURLs = [...imageURLs];
         updatedURLs[cropIndex] = URL.createObjectURL(croppedFile);
         setImageURLs(updatedURLs);
-  
-        // Destroy cropper instance and reset cropIndex
+
         cropperRef.current.destroy();
-        cropperRef.current = null; // Reset the ref
+        cropperRef.current = null;
         setCropIndex(null);
       });
     }
@@ -144,33 +131,33 @@ const EditProduct = () => {
 
   const handleRemoveImage = (index) => {
     const imageToRemove = product.images[index];
-    console.log('Removing image:', imageToRemove);
 
-    // Only attempt to delete cloud images
     if (imageToRemove?.public_id) {
-      console.log('Cloud image found. Attempting deletion...');
       axios
         .post(
           'http://localhost:4000/admin/products/delete-image',
           { public_id: imageToRemove.public_id },
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
           }
         )
         .then(() => {
           toast.success('Image removed successfully');
-          const updatedFiles = imageFiles.filter((_, i) => i !== index);
-          const updatedURLs = imageURLs.filter((_, i) => i !== index);
-          setImageFiles(updatedFiles);
-          setImageURLs(updatedURLs);
+          const updatedImageFiles = [...imageFiles];
+          const updatedImageURLs = [...imageURLs];
+          const updatedCropperRefs = [...cropperRefs.current];
+          updatedImageFiles.splice(index, 1);
+          updatedImageURLs.splice(index, 1);
+          updatedCropperRefs.splice(index, 1);
+          setImageFiles(updatedImageFiles);
+          setImageURLs(updatedImageURLs);
+          cropperRefs.current = updatedCropperRefs;
         })
         .catch((err) => {
           console.error('Error removing image:', err);
           toast.error('Failed to remove image');
         });
     } else {
-      // Handle local image removal
-
       const updatedFiles = imageFiles.filter((_, i) => i !== index);
       const updatedURLs = imageURLs.filter((_, i) => i !== index);
       setImageFiles(updatedFiles);
@@ -179,25 +166,59 @@ const EditProduct = () => {
     }
   };
 
+  const handleSizeChange = (index, field, value) => {
+    const updatedSizes = [...sizes];
+    updatedSizes[index][field] = value;
+    setSizes(updatedSizes);
+  };
+
+  const addSizeField = () => {
+    setSizes([...sizes, { size: '', stock: 0 }]);
+  };
+
+  const removeSizeField = (index) => {
+    setSizes(sizes.filter((_, i) => i !== index));
+  };
+  const cropperRefs = useRef([]); 
+
+ // Initialize cropper for images
+ useEffect(() => {
+  imageURLs.forEach((url, index) => {
+    const imageElement = cropperRefs.current[index];
+    if (imageElement && !imageElement.cropper) {
+      cropperRefs.current[index] = new Cropper(imageElement, {
+        aspectRatio: 1,
+        viewMode: 1,
+        autoCropArea: 0.8,
+      });
+    }
+  });
+
+  return () => {
+    cropperRefs.current.forEach((cropper) => {
+      if (cropper instanceof Cropper) {
+        cropper.destroy();
+      }
+    });
+  };
+}, [imageURLs]);
+
+
   const onSubmit = async (data) => {
     const formData = new FormData();
 
-    // Add form fields
     Object.keys(data).forEach((key) => {
       formData.append(key, Array.isArray(data[key]) ? JSON.stringify(data[key]) : data[key]);
     });
-
-    // Add new cropped images
+    formData.append('sizes', JSON.stringify(sizes));
     imageFiles.forEach((file) => formData.append('images', file));
-
-    // Add existing images
     product.images.forEach((img) => formData.append('existingImages', img.public_id));
 
     try {
       const response = await axios.put(`http://localhost:4000/admin/products/${id}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
         },
       });
 
@@ -216,92 +237,69 @@ const EditProduct = () => {
     <div className="container mt-5">
       <h2 className="text-center mb-4">Edit Product</h2>
       <form onSubmit={handleSubmit(onSubmit)}>
-
         <div className="mb-3">
           <label className="form-label">Name</label>
-          <input
-            type="text"
-            className="form-control"
-            {...register('name', { required: 'Name is required' })}
-          />
+          <input type="text" className="form-control" {...register('name', { required: 'Name is required' })} />
           {errors.name && <p className="text-danger">{errors.name.message}</p>}
         </div>
 
         <div className="mb-3">
           <label className="form-label">Description</label>
-          <textarea
-            className="form-control"
-            {...register('description', { required: 'Description is required' })}
-          />
+          <textarea className="form-control" {...register('description', { required: 'Description is required' })} />
           {errors.description && <p className="text-danger">{errors.description.message}</p>}
         </div>
 
         <div className="mb-3">
           <label className="form-label">Price</label>
-          <input
-            type="number"
-            className="form-control"
-            {...register('price', { required: 'Price is required' })}
-          />
+          <input type="number" className="form-control" {...register('price', { required: 'Price is required' })} />
           {errors.price && <p className="text-danger">{errors.price.message}</p>}
         </div>
 
-        <div className="mb-3">
-          <label className="form-label">Stock</label>
-          <input
-            type="number"
-            className="form-control"
-            {...register('stock', { required: 'Stock is required' })}
-          />
-          {errors.stock && <p className="text-danger">{errors.stock.message}</p>}
+        <div>
+          <h3>Sizes and Stock</h3>
+          {sizes.map((size, index) => (
+            <div key={index} className="d-flex gap-3 mb-3">
+              <input
+                type="text"
+                placeholder="Size"
+                value={size.size}
+                onChange={(e) => handleSizeChange(index, 'size', e.target.value)}
+                required
+                className="form-control"
+              />
+              <input
+                type="number"
+                placeholder="Stock"
+                value={size.stock}
+                onChange={(e) => handleSizeChange(index, 'stock', parseInt(e.target.value, 10))}
+                required
+                className="form-control"
+              />
+              <button type="button" className="btn btn-danger" onClick={() => removeSizeField(index)}>
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
 
         <div className="col-md-6">
-            <label>Category</label>
-            <select
-  className="form-select"
-  {...register('category', { required: 'Category is required' })}
->
-  <option value="">Select Category</option>
-  {Array.isArray(categories) &&
-    categories.map((category) => (
-      <option key={category._id} value={category.name}>
-        {category.name}
-      </option>
-    ))}
-</select>
-
-            {errors.category && <small className="text-danger">{errors.category.message}</small>}
-          </div>
-        <div className="mb-3">
-          <label className="form-label">Sizes</label>
-          <input
-            type="text"
-            className="form-control"
-            {...register('sizes')}
-            placeholder="Comma-separated sizes"
-          />
+          <label>Category</label>
+          <select className="form-select" {...register('category', { required: 'Category is required' })}>
+            <option value="">Select Category</option>
+            {Array.isArray(categories) && categories.map((category) => (
+              <option key={category._id} value={category._id}>{category.name}</option>
+            ))}
+          </select>
+          {errors.category && <small className="text-danger">{errors.category.message}</small>}
         </div>
 
         <div className="mb-3 form-check">
-          <input
-            type="checkbox"
-            className="form-check-input"
-            {...register('bestseller')}
-          />
+          <input type="checkbox" className="form-check-input" {...register('bestseller')} />
           <label className="form-check-label">BestSeller</label>
         </div>
 
-        <div className="mb-3">
-          <label className="form-label">Date</label>
-          <input
-            type="date"
-            className="form-control"
-            {...register('date')}
-          />
-        </div>
- {/* Display Existing Images */}
- <div className="mb-4">
+        {/* Existing Images */}
+        <div className="mb-4">
           <h4>Existing Images</h4>
           <div className="d-flex flex-wrap">
             {product.images.map((img, index) => (
@@ -334,36 +332,34 @@ const EditProduct = () => {
           />
         </div>
 
-       {/* Crop Options after Uploading New Images */}
-       <div className="mt-3 uploaded-images">
-  {imageURLs.map((url, index) => (
-    <div key={index} className="position-relative">
-      <img
-        src={url}
-        alt={`Uploaded Image ${index + 1}`}
-        className="img-thumbnail"
-        style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-        onClick={() => openCropper(index)}
-      />
-      <button
-        type="button"
-        className="btn btn-danger btn-sm position-absolute top-0 end-0"
-        onClick={() => handleRemoveImage(index)}
-      >
-        X
-      </button>
-    </div>
-  ))}
-</div>
-
-
-        {cropIndex !== null && (
-          <div className="text-center mt-3">
-            <button type="button" className="btn btn-success" onClick={handleCrop}>
-              Crop Image
-            </button>
+        {/* Crop Options after Uploading New Images */}
+        <div className="d-flex flex-wrap gap-3 mt-3">
+            {imageURLs.map((imageURL, index) => (
+              <div key={index} className="position-relative">
+                <img
+                  ref={(el) => (cropperRefs.current[index] = el)}
+                  src={imageURL}
+                  alt={`Preview ${index + 1}`}
+                  className="img-fluid border"
+                  style={{ maxWidth: '200px', maxHeight: '200px' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary mt-2"
+                  onClick={() => handleCrop(index)}
+                >
+                  Crop Image {index + 1}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger mt-2 ms-2"
+                  onClick={() => handleRemoveImage(index)}
+                >
+                  X
+                </button>
+              </div>
+            ))}
           </div>
-        )}
 
         {/* Submit Button */}
         <div className="text-center mt-4">
@@ -374,4 +370,5 @@ const EditProduct = () => {
     </div>
   );
 };
+
 export default EditProduct;
