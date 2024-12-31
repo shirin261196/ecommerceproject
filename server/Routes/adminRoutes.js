@@ -10,4 +10,6 @@ adminRouter.get('/users', adminAuth, getAllUsers);
 // Route to toggle user block/unblock status
 adminRouter.put('/users/:id', adminAuth, toggleUserStatus);
 
+
+
 export default adminRouter;
