@@ -5,11 +5,13 @@ import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import { toast } from 'react-toastify';
 import { useForm } from 'react-hook-form';
+import { fetchProducts } from '../../redux/slices/productSlice';
+import { useDispatch } from 'react-redux';
 
 const EditProduct = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const [product, setProduct] = useState({
     name: '',
     price: '',
@@ -26,6 +28,7 @@ const EditProduct = () => {
   const [imageURLs, setImageURLs] = useState([]);
   const [cropIndex, setCropIndex] = useState(null);
   const cropperRef = useRef(null);
+  const cropperRefs = useRef([]); // Make sure this is initialized
   const [sizes, setSizes] = useState([{ size: '', stock: 0 }]);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm();
@@ -37,6 +40,7 @@ const EditProduct = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
         });
         const data = response.data.product;
+        console.log('Fetched Product Data:', data);
         setProduct({
           ...data,
           sizes: data.sizes || [{ size: '', stock: 0 }],
@@ -46,7 +50,7 @@ const EditProduct = () => {
         setValue('name', data.name);
         setValue('price', data.price);
         setValue('stock', data.stock);
-        setValue('category', data.category);
+        setValue('category', data.category ? data.category._id : ''); 
         setValue('description', data.description);
         setSizes(data.sizes || [{ size: '', stock: 0 }]);
         setValue('bestseller', data.bestseller || false);
@@ -111,9 +115,7 @@ const EditProduct = () => {
     if (cropperRef.current) {
       const croppedCanvas = cropperRef.current.getCroppedCanvas();
       croppedCanvas.toBlob((blob) => {
-        const croppedFile = new File([blob], `cropped_${imageFiles[cropIndex].name}`, {
-          type: imageFiles[cropIndex].type,
-        });
+        const croppedFile = new File([blob], `cropped_${imageFiles[cropIndex].name}`, { type: imageFiles[cropIndex].type });
         const updatedFiles = [...imageFiles];
         updatedFiles[cropIndex] = croppedFile;
         setImageFiles(updatedFiles);
@@ -131,8 +133,9 @@ const EditProduct = () => {
 
   const handleRemoveImage = (index) => {
     const imageToRemove = product.images[index];
-
+  
     if (imageToRemove?.public_id) {
+      // Remove image from the cloud storage if it's an existing one
       axios
         .post(
           'http://localhost:4000/admin/products/delete-image',
@@ -143,21 +146,17 @@ const EditProduct = () => {
         )
         .then(() => {
           toast.success('Image removed successfully');
-          const updatedImageFiles = [...imageFiles];
-          const updatedImageURLs = [...imageURLs];
-          const updatedCropperRefs = [...cropperRefs.current];
-          updatedImageFiles.splice(index, 1);
-          updatedImageURLs.splice(index, 1);
-          updatedCropperRefs.splice(index, 1);
-          setImageFiles(updatedImageFiles);
-          setImageURLs(updatedImageURLs);
-          cropperRefs.current = updatedCropperRefs;
+          // Update the local state by removing the image from the list
+          const updatedImages = [...product.images];
+          updatedImages.splice(index, 1);
+          setProduct({ ...product, images: updatedImages });
         })
         .catch((err) => {
           console.error('Error removing image:', err);
           toast.error('Failed to remove image');
         });
     } else {
+      // Remove image from local preview (newly uploaded)
       const updatedFiles = imageFiles.filter((_, i) => i !== index);
       const updatedURLs = imageURLs.filter((_, i) => i !== index);
       setImageFiles(updatedFiles);
@@ -167,10 +166,19 @@ const EditProduct = () => {
   };
 
   const handleSizeChange = (index, field, value) => {
-    const updatedSizes = [...sizes];
-    updatedSizes[index][field] = value;
-    setSizes(updatedSizes);
+    setSizes((prevSizes) => {
+      const updatedSizes = [...prevSizes];
+      updatedSizes[index] = { 
+        ...updatedSizes[index], 
+        [field]: field === 'stock' ? (value === '' ? '' : parseInt(value, 10) || 0) : value 
+      };
+      return updatedSizes;
+    });
   };
+  
+  
+  
+  
 
   const addSizeField = () => {
     setSizes([...sizes, { size: '', stock: 0 }]);
@@ -179,41 +187,22 @@ const EditProduct = () => {
   const removeSizeField = (index) => {
     setSizes(sizes.filter((_, i) => i !== index));
   };
-  const cropperRefs = useRef([]); 
-
- // Initialize cropper for images
- useEffect(() => {
-  imageURLs.forEach((url, index) => {
-    const imageElement = cropperRefs.current[index];
-    if (imageElement && !imageElement.cropper) {
-      cropperRefs.current[index] = new Cropper(imageElement, {
-        aspectRatio: 1,
-        viewMode: 1,
-        autoCropArea: 0.8,
-      });
-    }
-  });
-
-  return () => {
-    cropperRefs.current.forEach((cropper) => {
-      if (cropper instanceof Cropper) {
-        cropper.destroy();
-      }
-    });
-  };
-}, [imageURLs]);
-
 
   const onSubmit = async (data) => {
     const formData = new FormData();
-
+  
+    // Append existing images (if any) to the FormData
+    product.images.forEach((img) => formData.append('existingImages', img.public_id));
+  
+    // Append new images to FormData
+    imageFiles.forEach((file) => formData.append('images', file));
+    formData.append('sizes', JSON.stringify(sizes));  // Make sure sizes are updated correctly
+  console.log(sizes)
+    // Append other product data
     Object.keys(data).forEach((key) => {
       formData.append(key, Array.isArray(data[key]) ? JSON.stringify(data[key]) : data[key]);
     });
-    formData.append('sizes', JSON.stringify(sizes));
-    imageFiles.forEach((file) => formData.append('images', file));
-    product.images.forEach((img) => formData.append('existingImages', img.public_id));
-
+  
     try {
       const response = await axios.put(`http://localhost:4000/admin/products/${id}`, formData, {
         headers: {
@@ -221,9 +210,18 @@ const EditProduct = () => {
           Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
         },
       });
-
+  
       if (response.data.success) {
         toast.success('Product updated successfully.');
+  
+        // Update the local product state with the new image data from response
+        const updatedProduct = response.data.product;
+        setProduct({
+          ...updatedProduct,
+          sizes: updatedProduct.sizes || [{ size: '', stock: 0 }],
+          images: updatedProduct.images || [],
+        });
+        dispatch(fetchProducts()); 
         navigate('/admin/products/list');
       } else {
         toast.error(response.data.message);
@@ -232,6 +230,13 @@ const EditProduct = () => {
       toast.error('Failed to update product.');
     }
   };
+  
+  
+
+  const allImages = [
+    ...product.images.map(img => ({ url: img.url, public_id: img.public_id })), // Assuming `product.images` has `url` and `public_id`
+    ...imageURLs.map(url => ({ url, public_id: null })) // Newly uploaded images (no public_id)
+  ];
 
   return (
     <div className="container mt-5">
@@ -256,30 +261,35 @@ const EditProduct = () => {
         </div>
 
         <div>
-          <h3>Sizes and Stock</h3>
-          {sizes.map((size, index) => (
-            <div key={index} className="d-flex gap-3 mb-3">
-              <input
-                type="text"
-                placeholder="Size"
-                value={size.size}
-                onChange={(e) => handleSizeChange(index, 'size', e.target.value)}
-                required
-                className="form-control"
-              />
-              <input
-                type="number"
-                placeholder="Stock"
-                value={size.stock}
-                onChange={(e) => handleSizeChange(index, 'stock', parseInt(e.target.value, 10))}
-                required
-                className="form-control"
-              />
-              <button type="button" className="btn btn-danger" onClick={() => removeSizeField(index)}>
-                Remove
-              </button>
-            </div>
-          ))}
+  <h3>Sizes and Stock</h3>
+  {sizes.map((size, index) => (
+    <div key={index} className="d-flex gap-3 mb-3">
+      <input
+        type="text"
+        placeholder="Size"
+        value={size.size || ''}
+        onChange={(e) => handleSizeChange(index, 'size', e.target.value)}
+      />
+      <input
+        type="number"
+        placeholder="Stock"
+        value={size.stock === '' ? '' : size.stock}
+        onChange={(e) => handleSizeChange(index, 'stock', e.target.value)}
+      />
+      <button
+        type="button"
+        className="btn btn-danger"
+        onClick={() => removeSizeField(index)}
+      >
+        Remove
+      </button>
+    </div>
+  ))}
+  <button type="button" className="btn btn-secondary" onClick={addSizeField}>
+    Add Size
+  </button>
+
+
         </div>
 
         <div className="col-md-6">
@@ -302,14 +312,15 @@ const EditProduct = () => {
         <div className="mb-4">
           <h4>Existing Images</h4>
           <div className="d-flex flex-wrap">
-            {product.images.map((img, index) => (
+            {allImages.map((img, index) => (
               <div key={index} className="position-relative">
-                <img
-                  src={img.url}
-                  alt={`Existing Image ${index + 1}`}
-                  className="img-thumbnail"
-                  style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                />
+               <img
+  src={img.url}
+  alt={`Existing Image ${index + 1}`} 
+  className="img-thumbnail"
+  style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+/>
+
                 <button
                   type="button"
                   className="btn btn-danger btn-sm position-absolute top-0 end-0"
@@ -371,4 +382,4 @@ const EditProduct = () => {
   );
 };
 
-export default EditProduct;
+export default EditProduct; 

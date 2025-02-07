@@ -9,6 +9,8 @@ import {
 import { Button, Table, Spinner, Alert, Pagination } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { currency } from '../../App';
+import Swal from 'sweetalert2';
+import axios from 'axios';
 
 const AdminOrderManagement = () => {
   const dispatch = useDispatch();
@@ -24,15 +26,81 @@ const AdminOrderManagement = () => {
     dispatch(fetchOrders());
   }, [dispatch]);
 
+   // Sort orders by createdAt in descending order
+   const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   const indexOfLastOrder = currentPage * itemsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - itemsPerPage;
-  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const currentOrders = sortedOrders.slice(indexOfFirstOrder, indexOfLastOrder);
 
   const totalPages = Math.ceil(orders.length / itemsPerPage);
 
   const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
  
 
+  const handleApproveReturn = async (orderId, itemId) => {
+    const confirmResult = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'Do you want to approve this return?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, approve it!',
+      cancelButtonText: 'No, cancel',
+    });
+
+    if (confirmResult.isConfirmed) {
+      try {
+        const response = await axios.put(
+          `http://localhost:4000/admin/orders/${orderId}/items/${itemId}/approve-return`,
+          { approvalStatus: 'APPROVED' }, // Send approval status
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+            },
+          }
+        );
+
+        // Refresh orders after approval
+        Swal.fire('Approved!', response.data.message, 'success');
+        dispatch(fetchOrders()); // Refresh the orders list from the server
+      } catch (error) {
+        Swal.fire('Error!', error.response?.data?.message || 'Failed to approve return', 'error');
+      }
+    }
+  };
+  
+  
+  const handleProcessRefund = async (orderId) => {
+    const confirmResult = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'Do you want to process a refund for this order?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, process it!',
+      cancelButtonText: 'No, cancel',
+    });
+
+    if (confirmResult.isConfirmed) {
+      try {
+        const response = await axios.post(
+          `http://localhost:4000/admin/orders/${orderId}/process-refund`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`, // User token
+              AdminAuthorization: `Bearer ${localStorage.getItem('adminToken')}`,
+            },
+          }
+        );
+
+        Swal.fire('Refund Processed!', response.data.message, 'success');
+        dispatch(fetchOrders()); // Refresh orders after processing refund
+      } catch (error) {
+        Swal.fire('Error!', error.response?.data?.message || 'Failed to process refund', 'error');
+      }
+    }
+  };
+  
   
   if (status === 'loading') {
     return (
@@ -41,7 +109,6 @@ const AdminOrderManagement = () => {
       </div>
     );
   }
-
   return (
     <div className="container-fluid py-4">
       <h2 className="text-center mb-4">Admin Order Management</h2>
@@ -59,6 +126,7 @@ const AdminOrderManagement = () => {
               <th>Items</th>
               <th>Total Price</th>
               <th>Status</th>
+              <th>Payment Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -101,6 +169,19 @@ const AdminOrderManagement = () => {
                     {order.status}
                   </span>
                 </td>
+
+                <td>
+                  {/* Display the payment status */}
+                  <span
+                    className={`ms-2 ${
+                      order.paymentStatus === 'Paid'
+                        ? 'text-success'
+                        : 'text-danger'
+                    }`}
+                  >
+                    {order.paymentStatus}
+                  </span>
+                </td>
                 <td>
                   <Button
                     variant="secondary"
@@ -109,6 +190,34 @@ const AdminOrderManagement = () => {
                   >
                     View Order
                   </Button>
+                 
+                  {order.items.map((item) => (
+  item.trackingStatus === 'RETURN_REQUESTED' && ( // Check for 'RETURN_REQUESTED' in item trackingStatus
+    <Button
+      key={item._id} // Unique key for the item
+      variant="success"
+      size="sm"
+      className="ms-2"
+      onClick={() => handleApproveReturn(order._id, item._id)} // Pass orderId and productId
+    >
+      Approve Return
+    </Button>
+  )
+))}
+
+
+
+{order.items.some(item => item.trackingStatus === 'RETURN_APPROVED') && !order.refundProcessed && (
+    <Button
+      variant="warning"
+      size="sm"
+      className="ms-2"
+      onClick={() => handleProcessRefund(order._id)}
+    >
+      Process Refund
+    </Button>
+  )}
+
                 </td>
               </tr>
             ))}

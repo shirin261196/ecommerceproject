@@ -37,7 +37,7 @@ const ProductDetails = () => {
       <p><strong>Name:</strong> {product.product.name}</p>
       <p><strong>Price:</strong> {product.price}</p>
       <p><strong>Quantity:</strong> {product.quantity}</p>
-      <p><strong>Status:</strong> {product.status}</p>
+      <p><strong>Status:</strong> {product.trackingStatus}</p>
 
       {/* Display product images */}
       <div className="product-images">

@@ -46,21 +46,7 @@ const ViewOrder = () => {
     });
   };
 
-  const handleApproveReturn = (productId) => {
-    Swal.fire({
-      title: 'Approve Return?',
-      text: 'Do you want to approve the return for this product?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, approve it!',
-      cancelButtonText: 'No, keep it',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        dispatch(approveReturnRequest({ orderId, productId }));
-        Swal.fire('Approved!', 'The return request has been approved.', 'success');
-      }
-    });
-  };
+
 
   // Determine order status based on tracking statuses
   const getOrderStatus = () => {
@@ -81,7 +67,20 @@ const ViewOrder = () => {
       <p><strong>Order ID:</strong> {order._id}</p>
       <p><strong>User:</strong> {order.user?.name || 'Unknown'}</p>
       <p><strong>Total Price:</strong> {currency}{order.totalPrice}</p>
+                  {order.discountAmount > 0 && (
+              <p><strong>Discount Amount:</strong> {currency}{order.discountAmount.toFixed(2)}</p>
+            )}
+            <p><strong>Final Price:</strong> {currency}{(order.finalPrice || 0).toFixed(2)}</p>
+      <p><strong>Total Quantity:</strong> {order.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+
       <p><strong>Order Status:</strong> {getOrderStatus()}</p>
+
+ {/* Add Payment Status and Method */}
+ <p><strong>Payment Status:</strong> {order.paymentStatus}</p>
+ <p>
+  <strong>Payment Method:</strong> {order.paymentMethod || 'N/A'}
+</p>
+  
 
       <h3>Shipping Address</h3>
       <p><strong>Name:</strong> {order.address?.fullname}</p>
@@ -94,83 +93,81 @@ const ViewOrder = () => {
 
       <h3>Order Items</h3>
       <Table striped bordered hover responsive>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Image</th>
-            <th>Quantity</th>
-            <th>Price</th>
-            <th>Total</th>
-            <th>Tracking Status</th>
-            <th>Actions</th>
-            <th>Change Status</th> {/* New Column */}
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item) => (
-            <tr key={item.product._id}>
-              <td>{item.product.name}</td>
-              <td>
-                {item.product.images && item.product.images.length > 0 ? (
-                  <img
-                    src={item.product.images[0].url}
-                    alt={item.product.name}
-                    style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <span>No image available</span>
-                )}
-              </td>
-              <td>{item.quantity}</td>
-              <td>{currency}{item.price}</td>
-              <td>{currency}{item.price * item.quantity}</td>
-              <td>{item.trackingStatus}</td>
-              <td>
-                {/* If returnRequested is true and trackingStatus is 'DELIVERED', show Approve Return */}
-                {item.trackingStatus !== 'CANCELLED' && !item.returnRequested && (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="ms-2"
-                    onClick={() => handleCancelOrder(item.product._id)}
+  <thead>
+    <tr>
+      <th>Product</th>
+      <th>Image</th>
+      <th>Quantity</th>
+      <th>Price</th>
+      <th>Total</th>
+      <th>Tracking Status</th>
+      <th>Actions</th>
+      <th>Change Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {order.items.map((item) => (
+      <tr key={item.product._id}>
+        <td>{item.product.name}</td>
+        <td>
+          {item.product.images && item.product.images.length > 0 ? (
+            <img
+              src={item.product.images[0].url}
+              alt={item.product.name}
+              style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+            />
+          ) : (
+            <span>No image available</span>
+          )}
+        </td>
+        <td>{item.quantity}</td>
+        <td>{currency}{item.price}</td>
+        <td>{currency}{item.price * item.quantity}</td>
+        <td>{item.trackingStatus}</td>
+        <td>
+  {item.trackingStatus !== 'CANCELLED' && item.trackingStatus !== 'DELIVERED' && (
+    <Button
+      variant="danger"
+      size="sm"
+      className="ms-2"
+      onClick={() => handleCancelOrder(item.product._id)}
+    >
+      Cancel Order
+    </Button>
+          )}
+   
+   
+        </td>
+        <td>
+        {item.trackingStatus !== 'CANCELLED' && item.trackingStatus !== 'DELIVERED' && (
+            <Dropdown className="d-inline ms-2">
+              <Dropdown.Toggle size="sm" variant="info">Change</Dropdown.Toggle>
+              <Dropdown.Menu>
+                {['PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((status) => (
+                  <Dropdown.Item
+                    key={status}
+                    onClick={() => handleTrackingStatusUpdate(item.product._id, status)}
                   >
-                    Cancel Order
-                  </Button>
-                )}
+                    {status}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+        </td>
+        <td>
+                <Button
+                  variant="link"
+                  onClick={() => navigate(`/admin/orders/${order._id}/products/${item.product._id}`)}
+                >
+                  View Details
+                </Button>
+              </td>
+      </tr>
+    ))}
+  </tbody>
+</Table>
 
-                {item.trackingStatus === 'DELIVERED' && item.trackingStatus === 'RETURNED' && (
-                  <Button
-                    variant="warning"
-                    size="sm"
-                    className="ms-2"
-                    onClick={() => handleApproveReturn(item.product._id)}
-                  >
-                    Approve Return
-                  </Button>
-                )}
-              </td>
-              <td>
-                {/* Option to change tracking status */}
-                {item.trackingStatus !== 'CANCELLED' && (
-                  <Dropdown className="d-inline ms-2">
-                    <Dropdown.Toggle size="sm" variant="info">Change</Dropdown.Toggle>
-                    <Dropdown.Menu>
-                      {['PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((status) => (
-                        <Dropdown.Item
-                          key={status}
-                          onClick={() => handleTrackingStatusUpdate(item.product._id, status)}
-                        >
-                          {status}
-                        </Dropdown.Item>
-                      ))}
-                    </Dropdown.Menu>
-                  </Dropdown>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
 
       <Button variant="secondary" onClick={() => window.history.back()}>
         Go Back
