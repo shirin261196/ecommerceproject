@@ -12,7 +12,8 @@ import {
   deleteImage,
   restoreProduct,
   updateStock,
-  getAllProducts
+  getAllProducts,
+ 
 } from '../controllers/productController.js';
 
 const productRouter = express.Router();
@@ -38,6 +39,8 @@ productRouter.put('/:id', adminAuth, upload.array('images', 3), updateProduct);
 productRouter.post('/delete-image', adminAuth, deleteImage);
 
 productRouter.put('/restore/:id',adminAuth,restoreProduct);
+
+
 
 
 productRouter.put('/update-stock/:id',adminAuth ,updateStock);
