@@ -8,6 +8,7 @@ import {
   selectOrderError,
   selectOrderHistory,
   selectOrderStatus,
+  fetchWalletBalance,
 } from '../../redux/slices/orderSlice.js';
 import { currency } from '../../App.jsx';
 import Swal from 'sweetalert2';
@@ -39,6 +40,8 @@ const OrderDetailsPage = () => {
   };
 
   const confirmCancelOrder = (orderId, itemId) => {
+    console.log("Frontend - OrderId:", orderId, "ItemId:", itemId);
+  
     Swal.fire({
       title: 'Are you sure?',
       text: 'Do you want to cancel this order?',
@@ -49,28 +52,42 @@ const OrderDetailsPage = () => {
     }).then((result) => {
       if (result.isConfirmed) {
         dispatch(cancelOrder({ orderId, itemId }));
-        Swal.fire('Cancelled!', 'Your order has been cancelled.', 'success');
+        
+        // Dispatch to update wallet balance after cancellation
+        dispatch(fetchWalletBalance()).then(() => {
+          // Show message after wallet balance update
+          Swal.fire('Cancelled!', 'Your order has been cancelled and the amount has been transferred to your wallet.', 'success');
+        });
+        
+        // Optionally, you can also fetch the order history after cancellation
         dispatch(fetchOrderHistory());
       }
     });
   };
+  
 
-  const confirmReturnOrder = (itemId) => {
+  const confirmReturnRequest = (orderId, itemId) => {
     Swal.fire({
       title: 'Are you sure?',
-      text: 'Do you want to return this item?',
+      text: 'Do you want to request a return for this item?',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Yes, return it!',
+      confirmButtonText: 'Yes, request return!',
       cancelButtonText: 'No, keep it',
     }).then((result) => {
       if (result.isConfirmed) {
-        dispatch(returnOrder({ orderId, itemId }));
-        Swal.fire('Returned!', 'Your item has been returned.', 'success');
-        dispatch(fetchOrderHistory());
+        dispatch(returnOrder({ orderId, itemId })).then((action) => {
+          if (action.meta.requestStatus === 'fulfilled') {
+            Swal.fire('Success!', 'Return request submitted successfully.', 'success');
+          } else {
+            Swal.fire('Error!', 'Failed to submit return request.', 'error');
+          }
+          dispatch(fetchOrderHistory());
+        });
       }
     });
   };
+  
 
   const totalPrice = order && !isNaN(order.totalPrice) ? order.totalPrice : 0;
 
@@ -99,8 +116,13 @@ const OrderDetailsPage = () => {
           <Card.Body>
             <h5 className="card-title">Order ID: {order.id || order._id}</h5>
             <p><strong>Status:</strong> {order.status}</p>
+            {order.discountAmount > 0 && (
+        <p><strong>Discount Amount:</strong> {currency}{order.discountAmount.toFixed(2)}</p>
+      )}
+      <p><strong>Final Price:</strong> {currency}{(order.finalPrice || 0).toFixed(2)}</p>
             <p><strong>Total Price:</strong> {currency}{totalPrice.toFixed(2)}</p>
-            <p><strong>Total Quantity:</strong> {order.totalQuantity}</p>
+            <p><strong>Total Quantity:</strong> {order.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+
             <hr />
             <Row>
               {order.address && (
@@ -152,18 +174,19 @@ const OrderDetailsPage = () => {
                     <td>{item.quantity}</td>
                     <td>{currency}{item.price.toFixed(2)}</td>
                     <td>
-                      {item.trackingStatus === 'DELIVERED' && (
+                    {['DELIVERED'].includes(item.trackingStatus) && (
                         <Button
-                          onClick={() => confirmReturnOrder(item.id)}
-                          variant="warning"
+                          onClick={() => confirmReturnRequest(order._id, item._id)}
+                          variant="info"
                           size="sm"
+                          className="me-2"
                         >
-                          Return
+                          Request Return
                         </Button>
                       )}
                       {['PENDING', 'SHIPPED'].includes((item.trackingStatus || '').toUpperCase()) && (
                         <Button
-                          onClick={() => confirmCancelOrder(order._id, item.id)}
+                          onClick={() => confirmCancelOrder(order._id, item._id)}
                           variant="danger"
                           size="sm"
                           className="me-2"

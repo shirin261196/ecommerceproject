@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { selectUser, selectUserId } from '../../redux/slices/authSlice';
 import Swal from 'sweetalert2';
 
+import { fetchWishlist, addToWishlist, removeFromWishlist, selectWishlistItems } from '../../redux/slices/wishlistSlice.js';
 const Product = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -26,10 +27,13 @@ const Product = () => {
   const [image, setImage] = useState('');
   const [discountPrice, setDiscountPrice] = useState(0);
   const [couponApplied, setCouponApplied] = useState('');
-  const [wishlist, setWishlist] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedSize, setSelectedSize] = useState(null);
   const [couponCode, setCouponCode] = useState('');
+  const wishlistItems = useSelector(selectWishlistItems);
+
+
   const navigate = useNavigate();
 
   // Fetch products using Redux on component mount
@@ -37,7 +41,10 @@ const Product = () => {
     if (products.length === 0) {
       dispatch(fetchProducts());
     }
-  }, [dispatch, products]);
+    if (userId) {
+      dispatch(fetchWishlist(userId));
+    }
+  }, [dispatch, products, userId]);
 
   // Fetch product data when the component is mounted
   useEffect(() => {
@@ -68,10 +75,45 @@ const Product = () => {
   };
 
   // Toggle wishlist status
-  const toggleWishlist = () => {
-    setWishlist(!wishlist);
-    toast.info(wishlist ? 'Removed from Wishlist' : 'Added to Wishlist');
+  const handleWishlist = () => {
+    const isInWishlist = wishlistItems.some((item) => item.productId === productData._id);
+  
+    // Validate selectedSize
+    if (!selectedSize) {
+      toast.error('Please select a size.');
+      return;
+    }
+  
+    // Find the size data
+    const sizeData = productData.sizes.find((size) => size.size === selectedSize);
+    if (!sizeData) {
+      toast.error('Selected size is not available.');
+      return;
+    }
+  
+    // Toggle wishlist state
+    if (isInWishlist) {
+      dispatch(removeFromWishlist({ userId, productId: productData._id }));
+      toast.info('Removed from Wishlist');
+    } else {
+      dispatch(
+        addToWishlist({
+          userId,
+          productId: productData._id,
+          name: productData.name,
+          price: productData.price,
+          sizes: productData.sizes, // Include sizes
+          images: productData.images.map(img => ({
+            url: img.url, // Extract URL
+            public_id: img.public_id, // Extract public_id
+          })),
+        })
+      );
+      toast.success('Added to Wishlist');
+    }
   };
+  
+  
 
   // Add to cart logic with SweetAlert
   const handleAddToCart = () => {
@@ -86,8 +128,8 @@ const Product = () => {
       toast.error('Selected size is out of stock.');
       return;
     }
-const productId = productData._id
-console.log('productID',productId)
+    const productId = productData._id
+    console.log('productID',productId)
 const images = productData.images?.length > 0 ? productData.images : [{ url: 'https://via.placeholder.com/150', public_id: 'placeholder' }];
 dispatch(
   addToCart({
@@ -247,15 +289,18 @@ console.log('Images:', productData.images);
             Add to Cart
           </button>
 
-          {/* Wishlist Button */}
-          <button
-            className={`btn w-100 py-2 my-2 ${wishlist ? 'btn-success' : 'btn-outline-success'}`}
-            onClick={toggleWishlist}
+            {/* Wishlist Button */}
+      
+            <button
+            className={`btn w-100 py-2 my-2 ${
+              wishlistItems.some((item) => item._id === productData._id) ? 'btn-success' : 'btn-outline-success'
+            }`}
+            onClick={handleWishlist}
           >
-            {wishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            {wishlistItems.some((item) => item._id === productData._id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
           </button>
-          </div>
-          </div>
+        </div>
+      </div>
           {/* Related Products */}
           <Relatedproducts category={productData.category} subcategory={productData.subcategory}/>
       

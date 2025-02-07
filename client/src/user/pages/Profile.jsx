@@ -5,6 +5,9 @@ import { fetchAddresses, addAddress, updateAddress, deleteAddress, selectAddress
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, ListGroup, Button, Form, Modal, Pagination } from 'react-bootstrap';
 import { selectUser } from '../../redux/slices/authSlice';
+import Swal from 'sweetalert2';
+import { fetchWalletBalance, selectWalletBalance } from '../../redux/slices/orderSlice';
+import { creditWallet, debitWallet } from '../../redux/slices/walletSlice';
 
 const UserProfile = () => {
   const dispatch = useDispatch();
@@ -12,12 +15,16 @@ const UserProfile = () => {
   const userProfile = useSelector(selectUserProfile);
   const addresses = useSelector(selectAddresses);
   const user = useSelector(selectUser);
+  const [walletAction, setWalletAction] = useState('');
+const [transactionAmount, setTransactionAmount] = useState(0);
+
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; // Number of addresses per page
   const [activeTab, setActiveTab] = useState('profile');
   const [showModal, setShowModal] = useState(false);
+  const walletBalance = useSelector(selectWalletBalance);
   const [addressForm, setAddressForm] = useState({
     _id: '',
     fullname: '',
@@ -34,6 +41,43 @@ const UserProfile = () => {
     dispatch(fetchAddresses());
   }, [dispatch, user.id]);
 
+  useEffect(() => {
+    dispatch(fetchWalletBalance());
+  }, [dispatch]); // Re-fetch when walletBalance changes
+  
+  const handleWalletAction = (action) => {
+    if (!transactionAmount || transactionAmount <= 0) {
+      Swal.fire('Invalid amount', 'Please enter a valid amount.', 'error');
+      return;
+    }
+  
+    if (action === 'credit') {
+      dispatch(creditWallet({ userId: user.id, amount: transactionAmount }))
+        .unwrap()
+        .then(() => {
+          Swal.fire('Success', 'Wallet credited successfully.', 'success');
+          setTransactionAmount(0);
+        })
+        .catch((error) => {
+          Swal.fire('Error', error.message, 'error');
+        });
+    } else if (action === 'debit') {
+      if (transactionAmount > walletBalance) {
+        Swal.fire('Error', 'Insufficient wallet balance.', 'error');
+        return;
+      }
+      dispatch(debitWallet({ userId: user.id, amount: transactionAmount }))
+        .unwrap()
+        .then(() => {
+          Swal.fire('Success', 'Wallet debited successfully.', 'success');
+          setTransactionAmount(0);
+        })
+        .catch((error) => {
+          Swal.fire('Error', error.message, 'error');
+        });
+    }
+  };
+  
   const handleTabChange = (tab) => setActiveTab(tab);
 
   const handleLogout = () => navigate('/login');
@@ -78,7 +122,21 @@ const UserProfile = () => {
   };
 
   const handleDeleteAddress = (addressId) => {
-    dispatch(deleteAddress({ addressId }));
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'Do you really want to delete this address? This action cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        dispatch(deleteAddress({ addressId }));
+        Swal.fire('Deleted!', 'The address has been deleted.', 'success');
+      }
+    });
   };
 
   // Pagination Logic
@@ -122,6 +180,14 @@ const UserProfile = () => {
             <ListGroup.Item action onClick={() => navigate('/forgot-password')}>
               Reset Password
             </ListGroup.Item>
+            <ListGroup.Item
+  action
+  active={activeTab === 'wallet'}
+  onClick={() => handleTabChange('wallet')}
+>
+  Wallet
+</ListGroup.Item>
+
             <ListGroup.Item action onClick={handleLogout}>
               Logout
             </ListGroup.Item>
@@ -154,6 +220,38 @@ const UserProfile = () => {
               {/* Render orders */}
             </div>
           )}
+{activeTab === 'wallet' && (
+  <div>
+    <h2>Wallet</h2>
+    <p>Your wallet balance: ₹{walletBalance || 0}</p>
+    <Form>
+      <Form.Group className="mb-3">
+        <Form.Label>Transaction Amount</Form.Label>
+        <Form.Control
+          type="number"
+          value={transactionAmount}
+          onChange={(e) => setTransactionAmount(parseFloat(e.target.value))}
+        />
+      </Form.Group>
+      <Button
+        variant="success"
+        onClick={() => handleWalletAction('credit')}
+        className="me-2"
+      >
+        Add Money
+      </Button>
+      <Button
+        variant="danger"
+        onClick={() => handleWalletAction('debit')}
+        disabled={walletBalance < transactionAmount}
+      >
+        Spend Money
+      </Button>
+    </Form>
+  </div>
+)}
+
+
 
           {activeTab === 'addresses' && (
             <div>

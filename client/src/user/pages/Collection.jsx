@@ -29,10 +29,12 @@ const Collection = () => {
   }, [dispatch]);
 
   // Filter products by selected categories
-  const filteredProducts = products.filter((item) =>
-    selectedCategories.length > 0 ? selectedCategories.includes(item.category) : true
-  );
-
+// Filter products by selected categories
+const filteredProducts = products.filter((item) =>
+  selectedCategories.length > 0
+    ? selectedCategories.includes(item.category._id.toString()) // Convert to string if needed
+    : true
+);
   // Further filter products by search input
   const searchedProducts = filteredProducts.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
