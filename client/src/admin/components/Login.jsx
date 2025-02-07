@@ -63,43 +63,29 @@ const AdminLogin = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
-  // Selector for token from Redux state
+
   const token = useSelector((state) => state.auth.token);
 
   const handleLogin = async (data) => {
     dispatch(loginRequest());
     try {
       const response = await axios.post(`${backendUrl}/admin/login`, data, { withCredentials: true });
-      console.log('Backend response:', response?.data);
-
       if (response?.data?.success) {
         const { token, user } = response.data;
-
-        localStorage.setItem('adminToken', token); // Save the token
+        localStorage.setItem('adminToken', token);
         localStorage.setItem('userRole', user.role);
-        dispatch(loginSuccess({ user: response.data.user, token: response.data.token }));
+        dispatch(loginSuccess({ user, token }));
         toast.success('Admin login successful');
       } else {
         dispatch(loginFailure(response?.data?.message));
         toast.error('Login failed');
       }
     } catch (error) {
-      console.log('Error details:', error);
       dispatch(loginFailure(error.message || 'Unknown error'));
       toast.error('An error occurred');
     }
   };
 
-  useEffect(() => {
-    if (!token) return; // Exit early if token is not present
-  
-    const role = localStorage.getItem('userRole');
-    if (role === 'admin') {
-      console.log('Navigating to admin dashboard');
-      navigate('/admin/products/list', { replace: true }); // Use `replace` to avoid history stack growth
-    }
-  }, [token, navigate]);
   useEffect(() => {
     const storedToken = localStorage.getItem('adminToken');
     const storedRole = localStorage.getItem('userRole');
@@ -107,8 +93,14 @@ const AdminLogin = () => {
       dispatch(loginSuccess({ token: storedToken, user: { role: storedRole } }));
     }
   }, [dispatch]);
-  
 
+  useEffect(() => {
+    if (!token) return;
+    const role = localStorage.getItem('userRole');
+    if (role === 'admin') {
+      navigate('/admin/products/list', { replace: true });
+    }
+  }, [token, navigate]);
 
   return (
     <Container>

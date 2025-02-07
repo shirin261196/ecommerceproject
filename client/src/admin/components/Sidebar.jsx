@@ -70,6 +70,11 @@ const Sidebar = () => {
     <SidebarContainer>
       <NavItems>
         <p>Dashboard</p>
+         {/* Category */}
+         <NavLinkStyled to="/admin/report">
+          <Icon src={assets.order_icon} alt="Category Icon" />
+          <NavText>Sales Report</NavText>
+        </NavLinkStyled>
         {/* Add Items */}
         <NavLinkStyled to="/admin/products/add">
           <Icon src={assets.add_icon} alt="Add Icon" />
@@ -105,6 +110,15 @@ const Sidebar = () => {
           <Icon src={assets.order_icon} alt="Category Icon" />
           <NavText>Stock</NavText>
         </NavLinkStyled>
+
+          
+
+     {/* Offers */}
+     <NavLinkStyled to="/admin/coupon">
+          <Icon src={assets.order_icon} alt="Category Icon" />
+          <NavText>Coupons and Offers</NavText>
+        </NavLinkStyled>
+
       </NavItems>
     </SidebarContainer>
   );
