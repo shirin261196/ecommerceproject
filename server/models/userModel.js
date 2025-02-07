@@ -12,6 +12,13 @@ const addressSchema = new mongoose.Schema({
   zip: { type: String, required: true },
   country: { type: String, required: true },
 });
+
+const walletTransactionSchema = new mongoose.Schema({
+  type: { type: String, enum: ["CREDIT", "DEBIT"], required: true },
+  amount: { type: Number, required: true },
+  description: { type: String },
+  date: { type: Date, default: Date.now },
+});
 // Define the user schema
 const userSchema = new Schema(
   {
@@ -25,6 +32,8 @@ const userSchema = new Schema(
     isVerified: { type: Boolean, default: false },
     cartData: { type: Object, default: {} },
     orders: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
+    walletBalance: { type: Number, default: 0 },
+    walletTransactions: [walletTransactionSchema],
   },
   { timestamps: true }
 );

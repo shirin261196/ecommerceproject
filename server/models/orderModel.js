@@ -22,9 +22,16 @@ const orderItemSchema = new mongoose.Schema({
   trackingStatus: { 
     type: String, 
     default: 'PENDING', 
-    set: (value) => value.toUpperCase() // Automatically convert to uppercase
+    set: (value) => value.toUpperCase(), // Automatically convert to uppercase
+    enum: ['PENDING', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURNED','CANCELLED','RETURN_APPROVED','RETURN_REJECTED'], // Tracking statuses
   },
-  
+  razorpayOrderId: {
+    type: String,
+    required: false, // Optional until Razorpay order is created
+  },
+  razorpayPaymentId: {
+    type: String,
+  },
 });
 
 // Main order schema
@@ -39,25 +46,54 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  discountAmount: { type: Number, default: 0 }, // Total discount applied
+  finalPrice: { type: Number, required: true }, // Final payable price after discounts
   totalQuantity: {
     type: Number,
   },
   status: {
     type: String,
-    enum: ['PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED'],
+    enum: ['PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURNED'],
     default: 'PENDING',
     set: (value) => value.toUpperCase(), // Convert to uppercase
   },
-  
+  paymentStatus: { 
+    type: String, 
+    default: 'Unpaid', 
+    enum: ['Unpaid', 'Paid'], 
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['Razorpay', 'COD', 'Wallet'], // Add methods as needed
+    default: 'Razorpay',
+  },
   address: {                          // Adding address to the order schema
     fullname: { type: String },
     phone: { type: String },
-    street: { type: String},
-    city: { type: String},
+    street: { type: String },
+    city: { type: String },
     state: { type: String },
     zip: { type: String },
     country: { type: String },
-  },  // Add address to the order
+  },
+  returnRequested: { 
+    type: Boolean, 
+    default: false, 
+  }, // Tracks if a return request has been initiated
+  adminApproval: { 
+    type: String, 
+    enum: ['PENDING', 'APPROVED', 'REJECTED'], 
+    default: 'PENDING', 
+  }, // Tracks admin approval status
+  refundAmount: { 
+    type: Number, 
+    default: 0, 
+  }, // Tracks refund amount processed
+  refundStatus: { 
+    type: String, 
+    enum: ['PENDING', 'COMPLETED'], 
+    default: 'PENDING', 
+  }, // Tracks if the refund has been processed
 }, { timestamps: true });  // This enables createdAt and updatedAt fields
 
 // Create the Order model

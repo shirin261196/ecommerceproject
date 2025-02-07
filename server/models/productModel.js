@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema(
         name: { type: String, required: true },
         description: { type: String, required: true },
         price: { type: Number, required: true },
+        discountPrice: { type: Number, default: null }, 
         category: {
             type: mongoose.Schema.Types.ObjectId, // Reference to Category model
             ref: 'Category', // Specify the model name
@@ -27,6 +28,7 @@ const productSchema = new mongoose.Schema(
             },
         ],
         deleted: { type: Boolean, default: false },
+      
     },
     { timestamps: true } // Adds createdAt and updatedAt automatically
 );
