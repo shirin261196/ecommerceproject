@@ -145,12 +145,16 @@ export const restoreProduct = async(req,res,next) =>{
   }
 }
 // Update Product
-export const updateProduct = async (req, res,next) => {
+export const updateProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, price, stock, category } = req.body;
+    const { name, price, stock, category, sizes } = req.body;
 
-    const updateFields = { name, price, stock, category };
+    // Parse sizes if sent as a string (e.g., from formData)
+    const parsedSizes = Array.isArray(sizes) ? sizes : JSON.parse(sizes || "[]");
+
+    // Prepare update fields for non-array properties
+    const updateFields = { name, price, category };
 
     // Handle uploaded images
     if (req.files && req.files.length > 0) {
@@ -163,16 +167,46 @@ export const updateProduct = async (req, res,next) => {
       updateFields.images = imageUploads;
     }
 
-    const product = await productModel.findByIdAndUpdate(id, updateFields, {
-      new: true,
-      runValidators: true,
-    });
+    // Find the product
+    const product = await productModel.findById(id);
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    res.status(200).json({ success: true, product });
+    // Update sizes if provided
+    if (Array.isArray(parsedSizes) && parsedSizes.length > 0) {
+      parsedSizes.forEach((sizeUpdate) => {
+        const sizeToUpdate = product.sizes.find((size) => size.size === sizeUpdate.size);
+
+        if (sizeToUpdate) {
+          sizeToUpdate.stock = sizeUpdate.stock; // Update existing size stock
+        } else {
+          // Add new size if it doesn't exist
+          product.sizes.push({ size: sizeUpdate.size, stock: sizeUpdate.stock });
+        }
+      });
+
+      // Mark sizes array as modified
+      product.markModified('sizes');
+    }
+
+    // Update overall stock if provided
+    if (stock !== undefined) {
+      product.stock = stock;
+    }
+
+    // Update other fields in the product
+    Object.keys(updateFields).forEach((key) => {
+      if (updateFields[key] !== undefined) {
+        product[key] = updateFields[key];
+      }
+    });
+
+    // Save the modified product
+    const updatedProduct = await product.save();
+
+    res.status(200).json({ success: true, product: updatedProduct });
   } catch (error) {
     console.error('Error updating product:', {
       message: error.message,
@@ -183,6 +217,8 @@ export const updateProduct = async (req, res,next) => {
     next(error);
   }
 };
+
+
 
 export const deleteImage = async (req, res,next) => {
   try {
@@ -236,6 +272,8 @@ export const updateStock = async (req, res,next) => {
     }
 
     sizeToUpdate.stock = stock; // Update the stock
+        // Mark the sizes array as modified
+        product.markModified('sizes');
 
     await product.save();
 
@@ -244,5 +282,3 @@ export const updateStock = async (req, res,next) => {
    next(error)
   }
 };
-
-

@@ -1,63 +1,174 @@
+import Razorpay from "razorpay";
 import Order from "../models/orderModel.js";
 import productModel from "../models/productModel.js";
 import userModel from "../models/userModel.js";
+import crypto from 'crypto'; // Correct for ES Modules
+import dotenv from 'dotenv';
 
 
+dotenv.config();
 
-export const createOrder = async (req, res,next) => {
-  const { items, totalPrice, totalQuantity,address} = req.body;
-  console.log('order',req.body)
-  console.log(items)
+// Initialize Razorpay instance
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+
+// Create Order
+export const createOrder = async (req, res) => {
+  const { items, totalPrice, totalQuantity, discountAmount, address, paymentMethod } = req.body;
+  console.log('Order body:', req.body);
+console.log('items',items)
   try {
     // Check if the user exists
     const user = await userModel.findById(req.user.id);
-    console.log('user',user);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Create a new order
-    const newOrder = new Order({
-      user:  req.user.id, 
-      items,
-      totalPrice,
-      totalQuantity,
-      status: 'PENDING',  // Initial status is PENDING
-      address,
-   
-    });
-    console.log('neworder',newOrder)
-
-     // Update stock for each product in the order
-     for (const item of items) {
+    // Validate and update stock for each product in the order
+    for (const item of items) {
       const product = await productModel.findById(item.product);
       if (product) {
         const sizeData = product.sizes.find((s) => s.size === item.size);
         if (sizeData && sizeData.stock >= item.quantity) {
-          sizeData.stock -= item.quantity; // Deduct the stock
+          sizeData.stock -= item.quantity; // Deduct stock
         } else {
-          return res.status(400).json({ message: `Insufficient stock for size ${item.size}` });
+          return res.status(400).json({
+            message: `Insufficient stock for size ${item.size} of product ${product.name}`,
+          });
         }
         await product.save();
+      } else {
+        return res.status(404).json({ message: `Product not found for ID ${item.product}` });
       }
     }
 
-    // Save the order to the database
+    // Calculate final price
+    const finalPrice = totalPrice - discountAmount;
+    if (finalPrice <= 0) {
+      return res.status(400).json({ message: 'Final price must be greater than 0.' });
+    }
+
+    // Create a Razorpay order if paymentMethod is Razorpay
+    let razorpayOrder = null;
+    if (paymentMethod === 'Razorpay') {
+      try {
+        razorpayOrder = await razorpay.orders.create({
+          amount: Math.round(finalPrice * 100), // Convert to paise
+          currency: 'INR',
+          receipt: `receipt_${Date.now()}`,
+        });
+      } catch (error) {
+        console.error('Error during Razorpay order creation:', error.message);
+        return res.status(500).json({
+          message: 'Failed to create Razorpay order. Please try again later.',
+          error: error.message,
+        });
+      }
+    }
+
+    console.log('Razorpay Order:', razorpayOrder);
+
+    // Create the order in the database
+    const newOrder = new Order({
+      user: req.user.id,
+      items: items.map((item) => ({
+        product: item.product,
+        quantity: item.quantity,
+        price: item.price,
+        size: item.size,
+        trackingStatus: 'PENDING',
+        paymentMethod: paymentMethod || 'Razorpay',
+        razorpayOrderId: razorpayOrder ? razorpayOrder.id : null, // Save Razorpay order ID
+      })),
+      totalPrice,
+      discountAmount,
+      finalPrice,
+      totalQuantity,
+      status: 'PENDING',
+      address,
+      paymentStatus: paymentMethod === 'COD' ? 'Unpaid' : 'Paid', // Default status
+    });
+
     await newOrder.save();
 
-    // Send a success response
-    res.status(201).json({ message: 'Order placed successfully', order: newOrder });
+    // Respond with both the Razorpay order and the newly created order
+    res.status(201).json({
+      message: 'Order placed successfully',
+      order: newOrder,
+      razorpayOrderId: razorpayOrder?.id || null, // Always return razorpayOrderId
+      currency: razorpayOrder?.currency || 'INR',
+      amount: razorpayOrder?.amount || finalPrice * 100, // Use finalPrice if Razorpay failed
+    });
   } catch (error) {
-  next(error)
+    console.error('Razorpay Order Creation Error:', error);
+    return res.status(500).json({
+      message: 'Failed to create Razorpay order. Please try again later.',
+      error: error.message || error, // Return error for debugging
+    }); // Forward to global error handler
   }
 };
 
+
+export const confirmPayment = async (req, res, next) => {
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  console.log('Received payment id:', razorpay_payment_id);
+console.log('Received order id:', razorpay_order_id);
+console.log('Received signature:', razorpay_signature);
+
+
+  try {
+    // 1. Verify the signature
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    }
+
+    console.log('Expected Signature:', expectedSignature);  // Log the expected signature
+    console.log('Received Signature:', razorpay_signature);
+
+    // 2. Fetch the payment details from Razorpay
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+    if (!payment || payment.status !== 'captured') {
+      return res.status(400).json({ success: false, message: 'Payment not captured' });
+    }
+
+    // 3. Update the order status in the database
+    const order = await Order.findOne({ razorpayOrderId: razorpay_order_id });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.paymentStatus = 'Success';
+    order.paymentDetails = payment;
+    await order.save();
+
+    // 4. Respond with success
+    return res.status(200).json({
+      success: true,
+      message: 'Payment confirmed successfully',
+      paymentDetails: payment,
+    });
+  } catch (error) {
+    console.error('Error in confirmPayment:', error);
+    next(error);
+  }
+};
 export const cancelOrder = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { itemId } = req.query; // Extract itemId from query
     console.log("Backend - OrderId:", orderId, "ItemId:", itemId); // Debug logging
-
+    const userId = req.user.id;
     // Validate presence of itemId
     if (!itemId) {
       return res.status(400).json({ message: "ItemId is required" });
@@ -91,68 +202,182 @@ export const cancelOrder = async (req, res, next) => {
       }
     }
 
+      // Update the wallet balance
+      const refundAmount = item.price * item.quantity; // Calculate refund amount
+      const user = await userModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      user.walletBalance += refundAmount; // Add refund to user's wallet
+      await user.save();
+
     // Save updated order
     const allItemsCancelled = order.items.every((i) => i.trackingStatus === 'CANCELLED');
     if (allItemsCancelled) order.status = 'CANCELLED';
     await order.save();
 
-    res.json({ message: 'Order item cancelled successfully', updatedOrder: order });
+
+
+    res.json({
+      message: "Order item cancelled successfully, and wallet updated",
+      updatedOrder: order,
+      walletBalance: user.walletBalance,
+    });
+
   } catch (error) {
     
     next(error);
   }
 };
 
+export const getWalletBalance = async (req, res) => {
+  try {
+    const userId = req.user.id; // Assuming user ID is available in req.user
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ walletBalance: user.walletBalance });
+  } catch (error) {
+    console.error("Error fetching wallet balance:", error);
+    res.status(500).json({ message: "Failed to fetch wallet balance" });
+  }
+};
 
 
 
 // Return Order Controller
-export const returnOrder = async (req, res, next) => {
-  const { orderId } = req.params;
+export const requestReturn = async (req, res, next) => {
+  const { orderId, itemId } = req.body;
 
   try {
-    // Find the order by ID
     const order = await Order.findById(orderId);
 
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // Check if the order is delivered
-    if (order.status !== 'DELIVERED') {
-      return res.status(400).json({ message: 'Order cannot be returned' });
-    }
+    const item = order.items.find((i) => i._id.toString() === itemId);
 
-    // Update tracking status of each item and restore stock
-    for (let item of order.items) {
-      if (item.trackingStatus !== 'RETURNED') {
-        item.trackingStatus = 'RETURNED';
+    if (!item) return res.status(404).json({ message: 'Item not found in the order' });
 
-        // Restore stock for the product
-   
-        const product = await productModel.findById(item.product);
-        if (product) {
-          const sizeData = product.sizes.find((s) => s.size === item.size);
-          if (sizeData) {
-            sizeData.stock += item.quantity; // Increment the stock
-            await product.save();
-          }
-        }
-      }
-    }
+    if (item.trackingStatus !== 'DELIVERED')
+      return res.status(400).json({ message: 'Return can only be requested for delivered items' });
 
-    // Update the overall order status to 'RETURNED'
-    order.status = 'RETURNED';
+    // Mark the item as return requested
+    item.trackingStatus = 'RETURN_REQUESTED';
+    order.returnRequested = true;
+    order.adminApproval = 'PENDING';
 
-    // Save the updated order
     await order.save();
-
-    res.status(200).json({ message: 'Order returned successfully', updatedOrder: order });
+    res.status(200).json({ message: 'Return request submitted', order });
   } catch (error) {
-    console.error('Error in returnOrder:', error);
     next(error);
   }
 };
+
+export const approveReturn = async (req, res, next) => {
+  const { orderId, itemId } = req.params;  // Extract from route params
+  const { approvalStatus } = req.body; // approvalStatus: APPROVED/REJECTED
+
+  try {
+    const order = await Order.findById(orderId);
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const item = order.items.find((i) => i._id.toString() === itemId);
+
+    if (!item) return res.status(404).json({ message: 'Item not found in the order' });
+
+    if (item.trackingStatus !== 'RETURN_REQUESTED')
+      return res.status(400).json({ message: 'Return request not found for this item' });
+
+    if (approvalStatus === 'APPROVED') {
+      item.trackingStatus = 'RETURN_APPROVED';
+      order.adminApproval = 'APPROVED';
+    } else if (approvalStatus === 'REJECTED') {
+      item.trackingStatus = 'RETURN_REJECTED';
+      order.adminApproval = 'REJECTED';
+    } else {
+      return res.status(400).json({ message: 'Invalid approval status' });
+    }
+
+    await order.save();
+    res.status(200).json({ message: `Return ${approvalStatus.toLowerCase()}`, order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const processRefund = async (req, res, next) => {
+  const { orderId } = req.params;
+
+  try {
+    // Fetch the order by ID and populate the user field
+    const order = await Order.findById(orderId).populate('user').populate('items.product');
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    // Get the user associated with the order
+    const user = order.user;
+    if (!user) {
+      return res.status(404).json({ message: 'User not found for this order.' });
+    }
+
+    let totalRefund = 0;
+
+    // Process refund for all items in the order
+    for (const item of order.items) {
+      if (item.trackingStatus !== 'RETURNED') {
+        item.trackingStatus = 'RETURNED';
+
+        // Update product stock
+        const product = await productModel.findById(item.product._id);
+        if (product) {
+          const sizeData = product.sizes.find((s) => s.size === item.size);
+          if (sizeData) {
+            sizeData.stock += item.quantity; // Increment stock
+            await product.save();
+          }
+        }
+
+        totalRefund += item.price * item.quantity; // Calculate refund
+      }
+    }
+
+    if (totalRefund === 0) {
+      return res.status(400).json({ message: 'No refundable items found in this order.' });
+    }
+
+    // Credit refund to the user's wallet
+    user.walletBalance += totalRefund;
+    user.walletTransactions.push({
+      type: 'CREDIT',
+      amount: totalRefund,
+      description: `Refund for order ${orderId}`,
+    });
+    await user.save();
+
+    // Update order status
+    order.status = 'RETURNED';
+    order.refunded = true;
+    order.refundAmount = totalRefund;
+    await order.save();
+
+    res.status(200).json({
+      message: 'Refund processed successfully and credited to wallet.',
+      updatedOrder: order,
+      walletBalance: user.walletBalance,
+    });
+  } catch (error) {
+    console.error('Error in processRefund:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+
+
 
 
 // Change the tracking status of a product in an order
@@ -308,9 +533,9 @@ export const changeOrderStatus = async (req, res, next) => {
 
 
 // Cancel an order
-export const cancelAdminOrder = async (req, res,next) => {
+export const cancelAdminOrder = async (req, res, next) => {
   try {
-    const { orderId} = req.params;
+    const { orderId } = req.params;
     const order = await Order.findById(orderId);
     
     if (!order) {
@@ -326,46 +551,31 @@ export const cancelAdminOrder = async (req, res,next) => {
       return res.status(400).send('Order is already cancelled');
     }
 
+    // Restore stock for each item in the order
+    for (const item of order.items) {
+      const product = await productModel.findById(item.product);
+      if (product) {
+        const sizeData = product.sizes.find((s) => s.size === item.size);
+        if (sizeData) {
+          sizeData.stock += item.quantity; // Restore stock
+          await product.save();
+        }
+      }
+    }
+
     // Update the order status to 'CANCELLED'
     order.status = 'CANCELLED';
     await order.save();
 
     res.status(200).send({ message: 'Order cancelled successfully', order });
   } catch (error) {
-    next(error)
+    next(error);
   }
 };
 
 
-export const returnApprove = async(req,res,next)=>{
-  const { orderId, productId } = req.params;
 
-  try {
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
 
-    // Find the item in the order
-    const item = order.items.find((item) => item.product._id.toString() === productId);
-    if (!item) {
-      return res.status(404).json({ message: 'Product not found in this order' });
-    }
-
-    // Approve return if requested
-    if (item.trackingStatus === 'DELIVERED' && item.returnRequested) {
-      item.returnStatus = 'APPROVED'; // Example return status field
-      await order.save();
-      return res.json(order); // Return the updated order
-    } else {
-      return res.status(400).json({ message: 'Return request cannot be approved' });
-    }
-  } catch (error) {
-   next(error)
-  }
-}
-
-// Function to derive overall order status
 
 
 
