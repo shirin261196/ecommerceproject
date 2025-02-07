@@ -119,6 +119,7 @@ const BestSeller = () => {
               image={imageUrl}
               price={item.price}
               stock={item.stock}
+              sizes={item.sizes}
             />
           );
         })}

@@ -108,6 +108,7 @@ const LatestCollection = () => {
               name={item.name}
               price={item.price}
               stock={item.stock}
+              sizes={item.sizes}
             />
           );
         })}
