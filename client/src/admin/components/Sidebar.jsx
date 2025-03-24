@@ -75,6 +75,13 @@ const Sidebar = () => {
           <Icon src={assets.order_icon} alt="Category Icon" />
           <NavText>Sales Report</NavText>
         </NavLinkStyled>
+
+        {/* Ledger */}
+        <NavLinkStyled to="/admin/ledger">
+          <Icon src={assets.order_icon} alt="Category Icon"  />
+          <NavText>Ledger Book</NavText>
+        </NavLinkStyled>
+
         {/* Add Items */}
         <NavLinkStyled to="/admin/products/add">
           <Icon src={assets.add_icon} alt="Add Icon" />
