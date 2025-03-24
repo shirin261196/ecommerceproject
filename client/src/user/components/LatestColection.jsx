@@ -73,7 +73,7 @@ const LatestCollectionContainer = styled.div`
 const LatestCollection = () => {
   const {products} = useSelector((state) => state.products);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   // Calculate pagination
   const totalPages = Math.ceil(products.length / itemsPerPage);

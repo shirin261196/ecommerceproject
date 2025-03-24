@@ -63,7 +63,7 @@ const Footer = () => {
           <FooterText className="h5 mb-3">GET IN TOUCH</FooterText>
           <ul className="list-unstyled">
             <li>+918137418148</li>
-            <li>contact@kidzcorner.com</li>
+           
           </ul>
         </Column>
       </Row>

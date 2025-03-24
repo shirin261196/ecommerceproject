@@ -7,7 +7,7 @@ import { Navbar, Nav, Container, NavDropdown } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';  
 import { logout } from '../../redux/slices/authSlice';  
 import { ShopContext } from '../../context/ShopContext';
-import { selectCartItems } from '../../redux/slices/cartSlice';
+import { fetchCart, selectCartItems } from '../../redux/slices/cartSlice';
 import { selectWishlistItems } from '../../redux/slices/wishlistSlice'; // Import selector for wishlist
 
 const Logo = styled.img`
@@ -42,7 +42,7 @@ const NavbarComponent = () => {
   // Fetch cart items when the component mounts
   useEffect(() => {
     if (user && user._id) {
-      dispatch(selectCartItems(user._id));
+      dispatch(fetchCart(user._id)); // Use the thunk to fetch cart data
     }
   }, [dispatch, user]);
 

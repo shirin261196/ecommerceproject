@@ -98,14 +98,14 @@ const ProductItem = ({ id, image = '', name, price, stock, sizes }) => {
         {price}
       </p>
 
-      {/* Size and stock information */}
-      <div className="size-info">
+   {/* Size and stock information */}
+   <div className="size-info">
         {sizes && sizes.length > 0 ? (
           <div>
             <strong>Sizes:</strong>
-            {sizes.map(({ size, stock }) => (
+            {sizes.map(({ size, stock }, index) => (
               <span
-                key={size}
+                key={`${id}-${size}-${index}`} // Unique key using id, size, and index
                 className={`size-item ${stock > 0 ? 'in-stock' : 'out-of-stock'}`}
               >
                 {size} ({stock > 0 ? `${stock} in stock` : 'Out of stock'})
@@ -116,8 +116,6 @@ const ProductItem = ({ id, image = '', name, price, stock, sizes }) => {
           <p>No sizes available</p>
         )}
       </div>
-
-    
     </ProductCard>
   );
 };

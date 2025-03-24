@@ -3,21 +3,24 @@ import Title from './Title';
 import ProductItem from './ProductItem';
 import { useSelector } from 'react-redux';
 
-const Relatedproducts = ({ category }) => {
-  const products = useSelector((state) => state.products.products); // Corrected the selector
+const Relatedproducts = ({ category}) => {
+   const {products} = useSelector((state) => state.products);// Corrected the selector
   const [related, setRelated] = useState([]);
-
   useEffect(() => {
-    if (products?.length > 0) { // Safely check for products array
-      // Filter products based on the category
+    console.log("Products from Redux:", products);
+    console.log("Category ID:", category);
+  
+    if (products?.length > 0) { 
       const filteredProducts = products.filter(
-        (item) => item.category === category
+        (item) => item.category?._id === category
       );
-
-      // Get the first 5 related products
+      
+  
+      console.log("Filtered Products:", filteredProducts);
       setRelated(filteredProducts.slice(0, 5));
     }
-  }, [products, category]); // Include category in dependency array
+  }, [products, category]); 
+   // Include category in dependency array
 
   return (
     <div className="my-5">
@@ -32,6 +35,7 @@ const Relatedproducts = ({ category }) => {
               name={item.name}
               price={item.price}
               stock={item.stock}
+              sizes={item.sizes}
               // Use the first image's URL or fallback
               image={item.images?.[0]?.url || 'https://via.placeholder.com/150'}
             />
