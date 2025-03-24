@@ -17,7 +17,9 @@ import couponRouter from './routes/couponRoutes.js';
 import reportRouter from './routes/reportRoutes.js';
 import wishlistRouter from './routes/wishlistRoutes.js';
 import walletRouter from './routes/walletRouter.js';
-
+import payRouter  from './routes/walletpayRoutes.js';
+import invoiceRouter from './routes/invoiceRoute.js';
+import bestRouter from './routes/topTenroutes.js';
 const { v2: cloudinary } = pkg;
 
 
@@ -73,6 +75,7 @@ app.use('/admin/products', productRouter);
 app.use('/admin/category', categoryRouter); // For category-related routes
 
 app.use('/user',cartRouter);
+app.use('/products',bestRouter);
 
 app.use('/',orderRouter);
 
@@ -83,6 +86,8 @@ app.use('/',couponRouter)
 app.use('/api/reports',reportRouter)
 app.use('/user',wishlistRouter)
 app.use('/user',walletRouter)
+app.use('/wallet',payRouter)
+app.use("/api", invoiceRouter);
 
 app.get('/', (req, res) => {
     res.send('Server is running!');

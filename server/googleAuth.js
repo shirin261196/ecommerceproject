@@ -19,6 +19,8 @@ export default (app) => {
     }));
 
     app.post('/google-login', async (req, res) => {
+        console.log('Google Login Request Received'); // Log that the request is received
+        console.log('Request Body:', req.body); 
         const { token } = req.body;
 
         if (!token) {
@@ -27,6 +29,7 @@ export default (app) => {
 
         console.log('Received token:', token);
         try {
+            console.log('Verifying Google token...');
             const ticket = await client.verifyIdToken({
                 idToken: token,
                 audience: '1063960380483-r5rjuccv61c7pel45o2q864ijbo45t2v.apps.googleusercontent.com', // Ensure this matches your Google client ID
@@ -52,12 +55,26 @@ export default (app) => {
 
             // Generate JWT token
             const jwtToken = jwt.sign(
-                { googleId: user.googleId, email: user.email, name: user.name },
+                {id: user._id, googleId: user.googleId, email: user.email, name: user.name },
                 process.env.JWT_SECRET || 'kidzcorner',
                 { expiresIn: '1h' }
             );
 
-            return res.json({ success: true, token: jwtToken });
+        console.log('JWT Token Generated:', jwtToken);
+
+        return res.json({
+            success: true,
+            token: jwtToken,
+            user: {
+              _id: user._id.toString(),
+              email: user.email,
+              name: user.name,
+              googleId: user.googleId,
+              role: user.role,
+              isBlocked: user.isBlocked,
+              isVerified: user.isVerified,
+            },
+          });
         } catch (error) {
             console.error('Error during Google login:', error); // Log the error details
             return res.status(500).json({ success: false, message: 'Server error', error: error.message });
