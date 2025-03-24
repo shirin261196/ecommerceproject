@@ -15,6 +15,8 @@ import ViewOrder from "../admin/pages/ViewOrder";
 import OfferManagement from "../admin/pages/Offers";
 import CouponManagement from "../admin/pages/Coupon";
 import SalesReport from "../admin/pages/SalesReport";
+import Ledger from "../admin/pages/Ledger";
+import BestSelling from "../admin/components/BestSelling";
 
 
 const AdminRoutes = () => {
@@ -36,6 +38,8 @@ const AdminRoutes = () => {
           <Route path="offers" element={<OfferManagement />} />
           <Route path="coupon" element={<CouponManagement />} />
           <Route path="report" element={<SalesReport />} />
+          <Route path="ledger" element={<Ledger />} />
+          <Route path="bestselling" element={<BestSelling/>}/>
         </Route>
       </Route>
     </Routes>

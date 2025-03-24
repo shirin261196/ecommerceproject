@@ -37,7 +37,8 @@ const UserRoutes = () => {
       <Route element={<ProtectedRoute userRole="user" />}>
         <Route path="/" element={<UserLayout />}>
         <Route path="profile" element={<Profile />} />
-      
+        <Route path="contact" element={<Contact />} />
+        <Route path="About" element={<About />} />
           <Route path="cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/orders" element={<UserOrderPage />} />
