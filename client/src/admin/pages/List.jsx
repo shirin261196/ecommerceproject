@@ -16,6 +16,7 @@ const List = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+
   // Access categories and loading state from Redux
   const { categories, loading: isLoadingCategories } = useSelector(
     (state) => state.categories
@@ -138,6 +139,9 @@ const List = () => {
 
   return (
     <div className="container my-4">
+  <button className="btn btn-primary" onClick={() => navigate("/admin/bestselling")}>
+    ⭐ Best Sellers
+  </button>
       <h2 className="text-center mb-4">Product List</h2>
 
       <div className="table-responsive">

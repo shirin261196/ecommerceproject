@@ -65,17 +65,20 @@ const Users = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
-        <div className="container-fluid">
-            <h3 className="my-4">User List</h3>
+        <div className="container">
+            <div className="d-flex justify-content-between align-items-center my-4">
+                <h3 className="text-primary">User List</h3>
 
+            </div>
+    
             <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                    <thead className="thead-dark">
+                <table className="table table-striped table-hover shadow-sm">
+                    <thead className="bg-dark text-white">
                         <tr>
                             <th>Name</th>
                             <th>Email</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <th className="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -83,28 +86,43 @@ const Users = () => {
                             <tr key={user._id}>
                                 <td>{user.name}</td>
                                 <td>{user.email}</td>
-                                <td>{user.isBlocked ? "Blocked" : "Active"}</td>
                                 <td>
-                                    <button onClick={() => toggleUserStatus(user._id, user.isBlocked)}>
-                                        {user.isBlocked ? "Unblock" : "Block"}
-                                    </button>
+                                    <span className={`badge ${user.isBlocked ? 'bg-danger' : 'bg-success'}`}>
+                                        {user.isBlocked ? "Blocked" : "Active"}
+                                    </span>
+                                </td>
+                                <td className="text-center">
+                                    <div className="btn-group">
+                                        <button 
+                                            className={`btn ${user.isBlocked ? 'btn-success' : 'btn-danger'} btn-sm`}
+                                            onClick={() => toggleUserStatus(user._id, user.isBlocked)}
+                                        >
+                                            {user.isBlocked ? "Unblock" : "Block"}
+                                        </button>
+                        
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-
+    
             {/* Pagination Controls */}
-            <Pagination>
-                {[...Array(Math.ceil(users.length / usersPerPage))].map((_, index) => (
-                    <Pagination.Item key={index + 1} active={index + 1 === currentPage} onClick={() => paginate(index + 1)}>
-                        {index + 1}
-                    </Pagination.Item>
-                ))}
-            </Pagination>
+            <nav aria-label="User pagination">
+                <ul className="pagination justify-content-center">
+                    {[...Array(Math.ceil(users.length / usersPerPage))].map((_, index) => (
+                        <li key={index + 1} className={`page-item ${index + 1 === currentPage ? 'active' : ''}`}>
+                            <button className="page-link" onClick={() => paginate(index + 1)}>
+                                {index + 1}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
         </div>
     );
+    
 };
 
 export default Users;

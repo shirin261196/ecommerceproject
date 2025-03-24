@@ -16,6 +16,7 @@ const EditProduct = () => {
     name: '',
     price: '',
     stock: '',
+    brand:'',
     category: '',
     description: '',
     sizes: [],
@@ -49,6 +50,7 @@ const EditProduct = () => {
 
         setValue('name', data.name);
         setValue('price', data.price);
+        setValue('brand',data.brand);
         setValue('stock', data.stock);
         setValue('category', data.category ? data.category._id : ''); 
         setValue('description', data.description);
@@ -252,6 +254,13 @@ const EditProduct = () => {
           <label className="form-label">Description</label>
           <textarea className="form-control" {...register('description', { required: 'Description is required' })} />
           {errors.description && <p className="text-danger">{errors.description.message}</p>}
+        </div>
+
+
+        <div className="mb-3">
+          <label className="form-label">Brand</label>
+          <input type="text" className="form-control" {...register('brand', { required: 'Brand is required' })} />
+          {errors.brand && <p className="text-danger">{errors.brand.message}</p>}
         </div>
 
         <div className="mb-3">

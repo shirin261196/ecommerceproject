@@ -11,6 +11,7 @@ const AddProduct = () => {
   const [imageFiles, setImageFiles] = useState([]);
   const [imageURLs, setImageURLs] = useState([]);
   const [sizes, setSizes] = useState([{ size: '', stock: 0 }]);  // Added sizes state
+  const [brand, setBrand] = useState('');
 
   const [popularity, setPopularity] = useState(0); // Initialize popularity
   const [averageRating, setAverageRating] = useState(0); // Initialize averageRating
@@ -134,6 +135,7 @@ const AddProduct = () => {
 
   const onSubmit = async (data) => {
     const formData = new FormData();
+    formData.append('brand', brand);
     formData.append('popularity', popularity);
     formData.append('averageRating', averageRating);
     formData.append('bestseller', bestseller);
@@ -160,6 +162,7 @@ const AddProduct = () => {
       if (response.data.message === 'Product added successfully') {
         toast.success(response.data.message);
         reset();
+        setBrand('');
         setImageFiles([]);
         setImageURLs([]);
         setSizes([{ size: '', stock: 0 }]);  // Reset sizes state
@@ -223,6 +226,17 @@ const AddProduct = () => {
             />
             {errors.price && <small className="text-danger">{errors.price.message}</small>}
           </div>
+          <div className="col-md-6">
+  <label>Brand</label>
+  <input
+    type="text"
+    className="form-control"
+    value={brand}
+    onChange={(e) => setBrand(e.target.value)}
+    required
+  />
+</div>
+
           <div className="form-group">
   <label>Popularity</label>
   <input

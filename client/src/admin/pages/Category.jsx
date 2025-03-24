@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { backendUrl } from '../../App';
 import { toast } from 'react-toastify';
+import { useForm } from 'react-hook-form';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { Pagination } from 'react-bootstrap';
@@ -9,6 +10,21 @@ import { Pagination } from 'react-bootstrap';
 const MySwal = withReactContent(Swal);
 
 const CategoryManagement = () => {
+    const {
+        register: registerAdd,
+        handleSubmit: handleSubmitAdd,
+        reset: resetAdd,
+        formState: { errors: addErrors },
+    } = useForm();
+    
+    const {
+        register: registerEdit,
+        handleSubmit: handleSubmitEdit,
+        setValue,
+        reset: resetEdit,
+        formState: { errors: editErrors },
+    } = useForm();
+
     const [categories, setCategories] = useState([]);
     const [newCategory, setNewCategory] = useState({ name: '', description: '' });
     const [editingCategory, setEditingCategory] = useState(null);
@@ -31,31 +47,49 @@ const CategoryManagement = () => {
         }
     };
 
-      // Add new category
-      const handleAddCategory = async () => {
-        if (categories.some((c) => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
-            toast.error('Category with this name already exists');
+    // Add new category
+    const handleAddCategory = async (data) => {
+        const trimmedName = data.name?.trim(); // Trim spaces before validation
+        const trimmedDescription = data.description?.trim(); // Trim spaces before validation
+    
+        // Validate category name
+        if (!trimmedName) {
+            toast.error("Category name cannot be empty or only spaces");
             return;
         }
+    
+        // Validate category description
+        if (!trimmedDescription) {
+            toast.error("Category description cannot be empty or only spaces");
+            return;
+        }
+    
+        // Check for duplicate category name (case insensitive)
+        if (categories.some((c) => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+            toast.error("Category with this name already exists");
+            return;
+        }
+    
         try {
-       
-const response = await axios.post(
-    `${backendUrl}/admin/category`,  
-    newCategory,
-    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
-);
-
+            const response = await axios.post(
+                `${backendUrl}/admin/category`,
+                { name: trimmedName, description: trimmedDescription }, // Save trimmed values
+                { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } }
+            );
+    
             if (response.data.success) {
                 toast.success(response.data.message);
                 fetchCategories();
-                setNewCategory({ name: '', description: '' });
+                resetAdd();
             } else {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            toast.error('Failed to add category');
+            console.error("Error adding category:", error.response?.data || error.message);
+            toast.error(error.response?.data?.message || "Failed to add category");
         }
     };
+    
 
     // Soft Delete category
     const handleDeleteCategory = async (id) => {
@@ -73,7 +107,7 @@ const response = await axios.post(
                 const response = await axios.put(
                     `${backendUrl}/admin/category/${id}/delete`,
                     { isDeleted: true },
-                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
+                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} ` } }
                 );
 
                 if (response.data.success) {
@@ -104,7 +138,7 @@ const response = await axios.post(
                 const response = await axios.put(
                     `${backendUrl}/admin/category/${id}/restore`,
                     { isDeleted: false },
-                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
+                    { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} ` } }
                 );
                 if (response.data.success) {
                     toast.success('Category restored successfully');
@@ -119,23 +153,48 @@ const response = await axios.post(
     };
 
     // Edit category
-    const handleEditCategory = async (id) => {
+    const handleEditCategory = async (data) => {
+        const trimmedName = data.name.trim(); // Trim spaces before validation
+        const trimmedDescription = data.description.trim(); // Trim spaces for description
+
+        // Validate category name
+        if (!trimmedName) {
+            toast.error("Category name cannot be empty or only spaces");
+            return;
+        }
+    
+        // Validate category description
+        if (!trimmedDescription) {
+            toast.error("Category description cannot be empty or only spaces");
+            return;
+        }
+    
+    
         try {
             const response = await axios.put(
-                `${backendUrl}/admin/category/${id}`,
-                editedCategoryData,
-                { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} `} }
+                `${backendUrl}/admin/category/${editingCategory}`, 
+                { ...data, name: trimmedName }, // Save trimmed name
+                { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')} ` } }
             );
+            
             if (response.data.success) {
                 toast.success(response.data.message);
                 fetchCategories();
                 setEditingCategory(null);
+                resetEdit();
             } else {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            toast.error('Failed to update category');
+            toast.error("Failed to update category");
         }
+    };
+    
+    // Function to set values when editing
+    const startEditing = (category) => {
+        setEditingCategory(category._id);
+        setValue("name", category.name); // Populate form fields
+        setValue("description", category.description);
     };
 
     useEffect(() => {
@@ -155,31 +214,35 @@ const response = await axios.post(
 
             {/* Add Category Form */}
             <div className="mb-4">
-                <h4>Add Category</h4>
-                <div className="row">
-                    <div className="col-md-6">
-                        <input
-                            type="text"
-                            className="form-control mb-2"
-                            placeholder="Category Name"
-                            value={newCategory.name}
-                            onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-                        />
-                    </div>
-                    <div className="col-md-6">
-                        <input
-                            type="text"
-                            className="form-control mb-2"
-                            placeholder="Category Description"
-                            value={newCategory.description}
-                            onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                        />
-                    </div>
+    <h4>Add Category</h4>
+    <form onSubmit={handleSubmitAdd(handleAddCategory)}> {/* ✅ Form properly wraps the input fields */}
+        <div className="row">
+            <div className="col-md-6">
+                <input
+                    type="text"
+                    className="form-control mb-2"
+                    placeholder="Category Name"
+                    {...registerAdd('name', { required: 'Category name is required' })}
+                    />
+                    {addErrors.name && <p className="text-danger">{addErrors.name.message}</p>}
                 </div>
-                <button className="btn btn-primary" onClick={handleAddCategory}>
-                    Add Category
-                </button>
-            </div>
+            <div className="col-md-6">
+                <input
+                    type="text"
+                    className="form-control mb-2"
+                    placeholder="Category Description"
+                    {...registerAdd('description', { required: 'Description is required' })}
+                    />
+                    {addErrors.description && <p className="text-danger">{addErrors.description.message}</p>}
+                </div>
+        </div>
+        <button className="btn btn-primary" type="submit">
+            Add Category
+        </button>
+    </form> {/* ✅ Properly closed the form */}
+</div>
+            
+
 
             {/* Categories List */}
             <h4 className="mb-3">Categories</h4>
@@ -200,45 +263,41 @@ const response = await axios.post(
                             <td>
                                 {editingCategory === category._id ? (
                                     <input
-                                        type="text"
-                                        className="form-control"
-                                        value={editedCategoryData.name}
-                                        onChange={(e) =>
-                                            setEditedCategoryData({ ...editedCategoryData, name: e.target.value })
-                                        }
-                                    />
+                                    type="text"
+                                    className="form-control"
+                                    {...registerEdit("name", { required: "Category name is required" })}
+                                />
                                 ) : (
                                     category.name
                                 )}
+                                {editErrors.name && <p className="text-danger">{editErrors.name.message}</p>}
                             </td>
                             <td>
-                                {editingCategory === category._id ? (
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        value={editedCategoryData.description}
-                                        onChange={(e) =>
-                                            setEditedCategoryData({
-                                                ...editedCategoryData,
-                                                description: e.target.value,
-                                            })
-                                        }
-                                    />
-                                ) : (
-                                    category.description
-                                )}
-                            </td>
+    {editingCategory === category._id ? (
+        <>
+            <input
+                type="text"
+                className="form-control"
+                {...registerEdit("description", { required: "Description is required" })}
+            />
+            {editErrors.description && <p className="text-danger">{editErrors.description.message}</p>}
+        </>
+    ) : (
+        category.description // ✅ Show only the category description when not editing
+    )}
+</td>
+
                             <td>{category.isDeleted ? 'Deleted' : 'Active'}</td>
                             <td>
                                 {editingCategory === category._id ? (
-                                    <>
-                                        <button className="btn btn-success me-2" onClick={() => handleEditCategory(category._id)}>
-                                            Save
-                                        </button>
-                                        <button className="btn btn-secondary" onClick={() => setEditingCategory(null)}>
-                                            Cancel
-                                        </button>
-                                    </>
+                                   <form onSubmit={handleSubmitEdit(handleEditCategory)}> {/* Form for editing */}
+                                   <button className="btn btn-success me-2" type="submit">
+                                       Save
+                                   </button>
+                                   <button className="btn btn-secondary" onClick={() => setEditingCategory(null)}>
+                                       Cancel
+                                   </button>
+                               </form>
                                 ) : category.isDeleted ? (
                                     <button
                                         className="btn btn-info"
@@ -250,7 +309,7 @@ const response = await axios.post(
                                     <>
                                         <button
                                             className="btn btn-warning me-2"
-                                            onClick={() => setEditingCategory(category._id)}
+                                            onClick={() => startEditing(category)}
                                         >
                                             Edit
                                         </button>

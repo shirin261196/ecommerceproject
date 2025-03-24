@@ -131,23 +131,22 @@ const AdminOrderManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {currentOrders.map((order, index) => (
-              <tr key={order._id}>
-                <td>{index + 1}</td>
-                <td>{order.user?.name || 'Unknown'}</td>
-                <td>
-                  {order.items.map((item) => (
-                    <div
-                      key={item.product._id}
-                      className="d-flex justify-content-between align-items-center mb-2"
-                    >
-                      <div>
-                        <strong>{item.product.name}</strong> - {currency}
-                        {item.price * item.quantity}
-                      </div>
-                    </div>
-                  ))}
-                </td>
+          {currentOrders?.map((order, index) => (
+    <tr key={order._id}>
+      <td>{index + 1}</td>
+      <td>{order.user?.name || 'Unknown'}</td>
+      <td>
+  {order.items?.map((item) => {
+    console.log("Item Data:", item); // Debugging: Check item structure
+    return (
+      <div key={item.product?._id || item._id || Math.random()}>
+        <strong>{item.product?.name || 'No Name'}</strong> - {currency}
+        {item.price * item.quantity}
+      </div>
+    );
+  })}
+</td>
+
                 <td>
                   {/* Calculate total price for the order */}
                   {order.items.reduce(

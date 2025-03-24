@@ -134,7 +134,7 @@ const CouponManagement = () => {
             headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
           });
           Swal.fire('Deleted!', 'Offer has been deleted.', 'success');
-          fetchOffers();  // Re-fetch the offers to reflect the changes
+           // Re-fetch the offers to reflect the changes
         } catch (error) {
           Swal.fire('Error', error.response?.data?.message || 'Error deleting offer', 'error');
         }
@@ -158,7 +158,7 @@ const CouponManagement = () => {
             headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
           });
           Swal.fire('Deleted!', 'Coupon has been deleted.', 'success');
-          fetchCoupons();  // Re-fetch the coupons to reflect the changes
+            // Re-fetch the coupons to reflect the changes
         } catch (error) {
           Swal.fire('Error', error.response?.data?.message || 'Error deleting coupon', 'error');
         }
