@@ -1,10 +1,16 @@
 import mongoose from 'mongoose';
+import productModel from './productModel.js';
 
 // Define sub-schema for order items
 const orderItemSchema = new mongoose.Schema({
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'product',  // Assuming your product model is named "Product"
+    required: true,
+  },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',  // Store product category reference
     required: true,
   },
   quantity: {
@@ -51,21 +57,27 @@ const orderSchema = new mongoose.Schema({
   totalQuantity: {
     type: Number,
   },
+  deliveryCharge: { type: Number, default: 0 },
   status: {
     type: String,
-    enum: ['PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURNED'],
+    enum: ['CONFIRMED','PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURNED','PAYMENT_FAILED'],
     default: 'PENDING',
     set: (value) => value.toUpperCase(), // Convert to uppercase
   },
   paymentStatus: { 
     type: String, 
-    default: 'Unpaid', 
-    enum: ['Unpaid', 'Paid'], 
+    default: 'Pending', 
+    enum: ['Unpaid', 'Paid', 'Failed', 'Pending']  
   },
+  paymentRetries: { type: Number, default: 0 },
   paymentMethod: {
     type: String,
     enum: ['Razorpay', 'COD', 'Wallet'], // Add methods as needed
     default: 'Razorpay',
+  },
+  razorpayOrderId: {  // Add this field to the root schema
+    type: String,
+    required: false,
   },
   address: {                          // Adding address to the order schema
     fullname: { type: String },
@@ -95,6 +107,19 @@ const orderSchema = new mongoose.Schema({
     default: 'PENDING', 
   }, // Tracks if the refund has been processed
 }, { timestamps: true });  // This enables createdAt and updatedAt fields
+
+
+// 🚀 Post-save hook to update product totalSold count
+orderSchema.post("save", async function (doc) {
+  for (const item of doc.items) {
+    await productModel.findByIdAndUpdate(
+      item.product,
+      { $inc: { totalSold: item.quantity } }, // Increment totalSold by ordered quantity
+      { new: true }
+    );
+  }
+});
+
 
 // Create the Order model
 const Order = mongoose.model('Order', orderSchema);

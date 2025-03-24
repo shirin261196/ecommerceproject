@@ -4,6 +4,7 @@ const productSchema = new mongoose.Schema(
     {
         name: { type: String, required: true },
         description: { type: String, required: true },
+        brand:{ type: String, required: true },
         price: { type: Number, required: true },
         discountPrice: { type: Number, default: null }, 
         category: {
@@ -27,6 +28,7 @@ const productSchema = new mongoose.Schema(
                 public_id: { type: String, required: true },
             },
         ],
+        totalSold: { type: Number, default: 0 },
         deleted: { type: Boolean, default: false },
       
     },

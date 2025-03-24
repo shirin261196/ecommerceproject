@@ -13,6 +13,7 @@ const categorySchema = new mongoose.Schema(
             type: String,
             default: '', // Default to empty string if not provided
             trim: true,
+            
         },
         isDeleted: {
             type: Boolean,
