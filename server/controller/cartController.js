@@ -3,7 +3,7 @@ import Coupon from "../models/couponModel.js";
 import Offer from "../models/offerModel.js";
 import productModel from "../models/productModel.js";
 import Wishlist from "../models/wishlistModel.js";
-import { calculateDiscountPrice } from "../utils/discount.js";
+
 
 
 // Fetch Cart
@@ -30,10 +30,17 @@ export const getCart = async (req, res, next) => {
 
     // Filter out items that are out of stock
     const validItems = cart.items.filter((item) => {
-      const selectedSize = item.product.sizes.find((s) => s.size === item.size);
+      if (!item.product) {
+        console.warn(`Cart contains a missing product. Item ID: ${item._id}`);
+        return false; // Remove null products
+      }
+    
+      const selectedSize = item.product.sizes?.find((s) => s.size === item.size);
       console.log('Item stock during filtering:', selectedSize ? selectedSize.stock : null);
+      
       return selectedSize && selectedSize.stock > 0;
     });
+    
 
     // Get current date for offer expiry checks
     const now = new Date();
@@ -147,6 +154,7 @@ export const addItemToCart = async (req, res, next) => {
       // Add new item
       cart.items.push({
         product: productId,
+        category: productData.category,
         size,
         quantity,
         price: productData.price,

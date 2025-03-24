@@ -4,6 +4,7 @@ import mongoose from 'mongoose'
 const { v2: cloudinary } = pkg;
 import { body, validationResult } from 'express-validator';
 import Cart from '../models/cartModel.js';
+import Order from '../models/orderModel.js';
 
 export const getAllProducts = async (req, res, next) => {
   try {
@@ -20,7 +21,7 @@ export const getAllProducts = async (req, res, next) => {
 // Add Product
 export const addProduct = async (req, res,next) => {
   try {
-    const { name, description, category, price,stock,newestArrival,popularity,averageRating, bestseller, sizes } = req.body;
+    const { name, description,brand, category, price,stock,newestArrival,popularity,averageRating, bestseller, sizes } = req.body;
     const date = req.body.date || Date.now();
     const parsedSizes = Array.isArray(sizes) ? sizes : JSON.parse(sizes);
 
@@ -44,6 +45,7 @@ export const addProduct = async (req, res,next) => {
     const product = new productModel({
       name,
       description,
+      brand,
       category,
       popularity,averageRating,newestArrival,
       price,
@@ -148,13 +150,13 @@ export const restoreProduct = async(req,res,next) =>{
 export const updateProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, price, stock, category, sizes } = req.body;
+    const { name, price, brand, stock, category, sizes } = req.body;
 
     // Parse sizes if sent as a string (e.g., from formData)
     const parsedSizes = Array.isArray(sizes) ? sizes : JSON.parse(sizes || "[]");
 
     // Prepare update fields for non-array properties
-    const updateFields = { name, price, category };
+    const updateFields = { name, price, brand,category };
 
     // Handle uploaded images
     if (req.files && req.files.length > 0) {
@@ -282,3 +284,129 @@ export const updateStock = async (req, res,next) => {
    next(error)
   }
 };
+
+export const bestSeller = async (req, res,next) => {
+  try {
+    const topProducts = await Order.aggregate([
+      { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } }, // Split items array
+      {
+        $group: {
+          _id: "$items.product", // Group by product ID
+          totalSold: { $sum: "$items.quantity" }, // Sum the quantity sold
+        },
+      },
+      { $sort: { totalSold: -1 } }, // Sort by total sold (descending)
+      { $limit: 10 }, // Get top 10 products
+      {
+        $lookup: {
+          from: "products", // Reference the products collection
+          localField: "_id",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      { $unwind: "$productDetails" }, // Unwrap product details
+      {
+        $project: {
+          _id: 0,
+          productId: "$_id",
+          name: "$productDetails.name",
+          price: "$productDetails.price", // Include price
+          stock: "$productDetails.stock", // Include stock
+          sizes: "$productDetails.sizes", // Include sizes
+          images: "$productDetails.images", // Include images
+          totalSold: 1,
+        },
+      },
+    ]);
+
+    res.json({ topProducts });
+  } catch (error) {
+   next(error)
+  }
+};
+
+export const bestCategory = async (req, res, next) => {
+  try {
+    const topCategories = await Order.aggregate([
+      { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } }, // Split items array
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      { $unwind: "$productDetails" }, // Unwrap product details
+      {
+        $group: {
+          _id: "$productDetails.category", // Group by category
+          totalSold: { $sum: "$items.quantity" },
+        },
+      },
+      { $sort: { totalSold: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "categories", // Lookup category details
+          localField: "_id",
+          foreignField: "_id",
+          as: "categoryInfo",
+        },
+      },
+      { $unwind: { path: "$categoryInfo", preserveNullAndEmptyArrays: true } },// Ensure categoryInfo is not an array
+      {
+        $project: {
+          _id: 0,
+          categoryId: "$_id",
+          categoryName: "$categoryInfo.name", // Get category name
+          categoryImage: "$categoryInfo.image", // ✅ Get category image
+          totalSold: 1,
+        },
+      },
+    ]);
+
+    res.json({ topCategories });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const bestBrand = async (req, res,next) => {
+  try {
+    const topBrands = await Order.aggregate([
+      { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      { $unwind: "$productDetails" },
+      {
+        $group: {
+          _id: "$productDetails.brand", // Group by brand
+          totalSold: { $sum: "$items.quantity" },
+        },
+      },
+      { $sort: { totalSold: -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 0,
+          brand: "$_id",
+          totalSold: 1,
+        },
+      },
+    ]);
+
+    res.json({ topBrands });
+  } catch (error) {
+    next(error)
+  }
+};
+

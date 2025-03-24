@@ -60,8 +60,7 @@ console.log("Password validation result:", isPasswordValid);
   
 
 
-
-const registerUser = async (req, res,next) => {
+const registerUser = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -77,14 +76,22 @@ const registerUser = async (req, res,next) => {
     // Generate OTP
     const otp = crypto.randomInt(100000, 999999).toString();
 
+    // Hash the OTP before storing
+    const hashedOtp = await bcrypt.hash(otp, 10);
+
+    // Store OTP in memory (Fix)
+    const userId = new mongoose.Types.ObjectId(); // Generate user ID
+    otpStore.set(userId.toString(), { hashedOtp, expiresAt: Date.now() + 5 * 60 * 1000 });
+
+    console.log(`Stored OTP for userId ${userId}:`, otpStore.get(userId.toString())); // Debug log
+
     // Create new user in the database (unverified)
     const newUser = new userModel({
+      _id: userId, // Assign the generated user ID
       name,
       email,
       password: hashedPassword,
-      otp,
       isVerified: false,
-      otpExpiresAt: Date.now() + 5 * 60 * 1000, // OTP valid for 5 minutes
     });
     await newUser.save();
 
@@ -94,22 +101,34 @@ const registerUser = async (req, res,next) => {
     res.status(201).json({
       success: true,
       message: 'Account created. OTP sent to your email. Please verify to complete registration.',
-      userId: newUser._id,
+      userId: userId.toString(), // Send the generated userId to frontend
     });
   } catch (error) {
     next(error);
   }
 };
 
+
 const otpStore = new Map(); // Temporary in-memory store
 
 // Generate OTP
-async function generateAndStoreOtp(userId) {
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const hashedOtp = await bcrypt.hash(otp, 10); // Hash the OTP
-    otpStore.set(userId, { hashedOtp, expiresAt: Date.now() + 5 * 60 * 1000 }); // Store with expiry
-    return otp; // Send plain OTP to the user
-}
+const generateAndStoreOtp = async (userId) => {
+  try {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6-digit OTP
+    const hashedOtp = await bcrypt.hash(otp, 10); // Hash OTP
+    const expiresAt = Date.now() + 5 * 60 * 1000; // Set expiry time (5 min)
+
+    // Store OTP in memory
+    otpStore.set(userId, { hashedOtp, expiresAt });
+
+    console.log(`Stored OTP for ${userId}:`, otpStore.get(userId)); // Debug log
+
+    return otp;
+  } catch (error) {
+    console.error("Error generating OTP:", error);
+  }
+};
+
 
 // Verify OTP Route
 const verifyOtp = async (req, res, next) => {
@@ -118,6 +137,7 @@ const verifyOtp = async (req, res, next) => {
 
     // Get OTP data from store
     const data = otpStore.get(userId);
+    console.log("Verifying OTP for userId:", userId);
     console.log("Fetched OTP Data:", data);
 
     // Check if OTP exists and is not expired
@@ -128,8 +148,8 @@ const verifyOtp = async (req, res, next) => {
     const { hashedOtp, expiresAt } = data;
 
     // Check if OTP has expired
-    if (Date.now() > data.expiresAt) {
-      console.log("Current Time:", Date.now(), "Expiry Time:", data.expiresAt);
+    if (Date.now() > expiresAt) {
+      console.log("Current Time:", Date.now(), "Expiry Time:", expiresAt);
       otpStore.delete(userId);
       return res.json({ success: false, message: "OTP expired" });
     }
@@ -169,6 +189,10 @@ const resendOtp = async (req, res,next) => {
           console.error("User not found with email:", email);
         return res.json({ success: false, message: "User not found" });
         }
+
+
+    // Delete old OTP if exists before generating a new one
+    otpStore.delete(user._id.toString());
 
         const otp = await generateAndStoreOtp(user._id.toString());
         await sendOtpEmail(email, otp);
