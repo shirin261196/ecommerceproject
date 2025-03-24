@@ -100,11 +100,52 @@ export const returnOrder = createAsyncThunk(
 );
 
 
+export const handlePaymentFailure = createAsyncThunk(
+  'order/handlePaymentFailure',
+  async (orderId, { rejectWithValue }) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.post(
+        'http://localhost:4000/orders/user/payment-failed',
+        { orderId },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Payment failure handling failed.');
+    }
+  }
+);
+
+export const retryPayment = createAsyncThunk(
+  'order/retryPayment',
+  async (orderId, { rejectWithValue }) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.post(
+        'http://localhost:4000/orders/user/retry-payment',
+        { orderId },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Retrying payment failed.');
+    }
+  }
+);
+
+
 
 export const createOrder = createAsyncThunk(
   'order/createOrder',
   async ({ items, totalPrice, address,discountAmount, finalPrice,paymentMethod }, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
+
+    console.log("📤 Order Data Sent:", { items, totalPrice, address, discountAmount, finalPrice, paymentMethod });
     try {
       const response = await axios.post(
         `http://localhost:4000/user/orders/create`,
@@ -116,7 +157,7 @@ export const createOrder = createAsyncThunk(
       if (paymentMethod === 'Razorpay' && response.data.razorpayOrderId) {
         return response.data; // Ensure razorpayOrderId is returned
       }
-
+      console.log("✅ Order Response:", response.data);
       return response.data; // For other payment methods (e.g., COD)
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create order');
@@ -151,6 +192,16 @@ const orderSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
+      .addCase(handlePaymentFailure.fulfilled, (state, action) => {
+        state.orders = state.orders.map(order =>
+          order._id === action.payload.orderId ? { ...order, paymentStatus: 'Pending' } : order
+        );
+      })
+      .addCase(retryPayment.fulfilled, (state, action) => {
+        state.orders = state.orders.map(order =>
+          order._id === action.payload.orderId ? { ...order, paymentStatus: 'Processing' } : order
+        );
+      });
 
     // Cancel Order
     builder

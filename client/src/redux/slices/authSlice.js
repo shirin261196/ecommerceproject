@@ -27,7 +27,7 @@ const authSlice = createSlice({
     },
     loginSuccess: (state, action) => {
       state.loading = false;
-      state.user = action.payload?.user || {};
+      state.user = action.payload?.user || null;
       state.token = action.payload?.token || null;
       
       // Save token and user to localStorage only if server response contains valid data
@@ -38,11 +38,14 @@ const authSlice = createSlice({
         localStorage.setItem('userRole', 'default');
       }
 
-      // Save user data and token to localStorage
-      if (action.payload?.user?.id) {
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
-        localStorage.setItem('userId', action.payload.user?.id);
-      }
+      const userId = action.payload?.user?.id || action.payload?.user?._id; // Check both id and _id
+  if (userId) {
+    localStorage.setItem('user', JSON.stringify(action.payload.user));
+    localStorage.setItem('userId', userId);
+    console.log('loginSuccess - User ID set:', userId); // Debug
+  } else {
+    console.error('loginSuccess - No valid user ID found in payload:', action.payload);
+  }
     },
     loginFailure: (state, action) => {
       state.loading = false;
@@ -65,7 +68,8 @@ export const selectIsAuthenticated = (state) => !!state.auth.token || !!localSto
 export const selectUser = (state) => state.auth.user;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;
-export const selectUserId = (state) => state.auth.user?.id || null; // Selector for `userId`
+export const selectUserId = (state) => state.auth.user ? (state.auth.user.id || state.auth.user._id) : null;
+ // Selector for `userId`
 
 export const { loginRequest, loginSuccess, loginFailure, logout } = authSlice.actions;
 export default authSlice.reducer;

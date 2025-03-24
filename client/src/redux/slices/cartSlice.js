@@ -30,8 +30,13 @@ export const fetchCart = createAsyncThunk(
           Authorization: `Bearer ${token}`,
         },
       });
-      return response.data.data; // Ensure the response data structure is correct
+      console.log('Fetch Cart Response:', response.data);
+      return response.data.data || { items: [] }; // Fallback if cart is empty
     } catch (error) {
+      if (error.response?.status === 404) {
+        return { items: [] }; // Return empty cart if not found
+      }
+      console.error('Fetch Cart Error:', error.response?.data);
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
     }
   }
@@ -209,14 +214,16 @@ const cartSlice = createSlice({
 
     // Clear Cart
     builder.addCase(clearCart.fulfilled, (state, action) => {
-      state.items = action.payload.data.items || [];
-      state.totalPrice = action.payload.data.totalPrice || 0;
-      state.finalPrice = action.payload.data.finalPrice || 0;
-      state.totalQuantity = action.payload.data.totalQuantity || 0;
-    }) 
+      const data = action.payload?.data || {};  // Ensure data exists
+      state.items = data.items || [];
+      state.totalPrice = data.totalPrice || 0;
+      state.finalPrice = data.finalPrice || 0;
+      state.totalQuantity = data.totalQuantity || 0;
+    })
     .addCase(clearCart.rejected, (state, action) => {
       state.error = action.payload || 'Failed to clear cart';
     });
+    
   },
 });
 
