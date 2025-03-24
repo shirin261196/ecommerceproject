@@ -36,6 +36,11 @@ const Product = () => {
 
   const navigate = useNavigate();
 
+  // Debug Redux state
+  console.log('Raw state.auth:', useSelector((state) => state.auth));
+  console.log('Redux User:', user); // Should log the full user object with _id
+  console.log('User ID in Product component:', userId);
+
   // Fetch products using Redux on component mount
   useEffect(() => {
     if (products.length === 0) {
@@ -60,19 +65,7 @@ const Product = () => {
     }
   }, [id, products]);
 
-  // Apply coupon logic
-  const applyCoupon = () => {
-    if (couponCode.trim() === 'SAVE10') {
-      const newPrice = productData.price - productData.price * 0.1;
-      setDiscountPrice(newPrice.toFixed(2));
-      setCouponApplied('SAVE10');
-      setErrorMessage('');
-      toast.success('Coupon applied successfully!');
-    } else {
-      setErrorMessage('Invalid Coupon Code');
-      toast.error('Invalid Coupon Code');
-    }
-  };
+
 
   // Toggle wishlist status
   const handleWishlist = () => {
@@ -93,9 +86,9 @@ const Product = () => {
   
     // Toggle wishlist state
     if (isInWishlist) {
-      dispatch(removeFromWishlist({ userId, productId: productData._id }));
-      toast.info('Removed from Wishlist');
-    } else {
+      toast.error('Product is already in Wishlist');
+      return;
+    }
       dispatch(
         addToWishlist({
           userId,
@@ -111,8 +104,8 @@ const Product = () => {
       );
       toast.success('Added to Wishlist');
     }
-  };
   
+
   
 
   // Add to cart logic with SweetAlert
@@ -121,7 +114,7 @@ const Product = () => {
       toast.error('Please select a size.');
       return;
     }
-
+    console.log('Adding to cart with userId:', userId);
     const sizeData = productData.sizes.find((size) => size.size === selectedSize);
 
     if (!sizeData || sizeData.stock <= 0) {
@@ -136,6 +129,7 @@ dispatch(
     userId,
     productId: productData._id,
     name: productData.name,
+    category: productData.category,
     size: selectedSize,
     price: productData.price,
     stock: sizeData.stock,
@@ -170,7 +164,7 @@ console.log('Images:', productData.images);
             <Link to="/">Home</Link>
           </li>
           <li className="breadcrumb-item">
-            <Link to="/products">Products</Link>
+            <Link to="/collection">Products</Link>
           </li>
           <li className="breadcrumb-item active" aria-current="page">
             {productData.name}
@@ -212,6 +206,7 @@ console.log('Images:', productData.images);
         {/* Right Column: Product Information */}
         <div className="col-5">
           <h1 className="fw-bold fs-3">{productData.name}</h1>
+          
           <div className="d-flex align-items-center gap-1 mt-2">
             {Array(5)
               .fill(0)
@@ -226,6 +221,7 @@ console.log('Images:', productData.images);
               ))}
             <p className="ms-2 mb-0">Reviews(122)</p>
           </div>
+          <h6 className="mt-4 fs-3">{productData.brand}</h6>
 
           <p className="mt-4 fs-2 fw-bold text-danger">
             {currency}{discountPrice || productData.price}
@@ -256,22 +252,7 @@ console.log('Images:', productData.images);
             </div>
           </div>
 
-          {/* Coupon Code */}
-          <div className="mt-4">
-            <p className="fw-bold">Apply Coupon</p>
-            <div className="d-flex gap-2">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Enter Coupon Code"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-              />
-              <button className="btn btn-primary" onClick={applyCoupon}>
-                Apply
-              </button>
-            </div>
-          </div>
+    
 
           {/* Error Message */}
           {errorMessage && (
@@ -293,16 +274,16 @@ console.log('Images:', productData.images);
       
             <button
             className={`btn w-100 py-2 my-2 ${
-              wishlistItems.some((item) => item._id === productData._id) ? 'btn-success' : 'btn-outline-success'
+              wishlistItems.some((item) => item.productId === productData._id) ? 'btn-success' : 'btn-outline-success'
             }`}
             onClick={handleWishlist}
           >
-            {wishlistItems.some((item) => item._id === productData._id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            {wishlistItems.some((item) => item.productId === productData._id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
           </button>
         </div>
       </div>
           {/* Related Products */}
-          <Relatedproducts category={productData.category} subcategory={productData.subcategory}/>
+          <Relatedproducts category={productData.category._id}/>
       
     </div>
   ) : (

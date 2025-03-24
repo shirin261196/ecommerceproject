@@ -12,7 +12,7 @@ const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const isAuthenticated = useSelector(selectIsAuthenticated); // Check if user is already authenticated
-  const backendUrl = "https://150e-2405-201-f018-f0ba-58dd-bc19-a429-898e.ngrok-free.app";
+  const backendUrl = "https://d81b-2405-201-f018-f0ba-b00e-df89-2fab-fee2.ngrok-free.app";
 
 
   const token = useSelector((state) => state.auth.token);
@@ -24,16 +24,26 @@ console.log("Token in Redux state:", token); // Should print the token
     formState: { errors },
   } = useForm();
 
-    // Load token and user on page refresh
-    useEffect(() => {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (token && user) {
-        dispatch(loginSuccess({ token, user }));
-      } else {
-        dispatch(logout());
+  // Load token and user on page refresh (Merged both useEffects)
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+  
+    if (storedToken && storedUser) {
+      try {
+        const user = JSON.parse(storedUser); // Safely parse
+        dispatch(loginSuccess({ token: storedToken, user }));
+      } catch (error) {
+        console.error("Failed to parse stored user data:", error);
+        localStorage.removeItem("user"); // Clear invalid data
+        localStorage.removeItem("token"); // Clear token too for consistency
+        dispatch(logout()); // Reset auth state
       }
-    }, [dispatch]);
+    } else {
+      dispatch(logout()); // No valid data, log out
+    }
+  }, [dispatch]);
+    
     
 
   useEffect(() => {
@@ -63,12 +73,13 @@ console.log("Token in Redux state:", token); // Should print the token
       const result = await axios.post(`${backendUrl}/google-login`, {
         token: response.credential,
       });
-
+      console.log("Response from backend:", result);
+      console.log("Response Data:", result.data);
       if (result.data.success) {
         const { token, user } = result.data;
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify(user));
-        dispatch(loginSuccess({ token: result.data.token, user: result.data.user }));
+        dispatch(loginSuccess({ token, user }));
         toast.success("Google Sign-In successful!");
         navigate("/", { replace: true });
       } else {
@@ -78,21 +89,15 @@ console.log("Token in Redux state:", token); // Should print the token
       toast.error("Error during Google Sign-In");
     }
   };
-  useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = JSON.parse(localStorage.getItem("user"));
-    if (storedToken && storedUser) {
-      dispatch(loginSuccess({ token: storedToken, user: storedUser }));
-    }
-  }, [dispatch]);
+
   
 
   const onSubmit = async (data) => {
     try {
       const response = await axios.post(`${backendUrl}/login`, data);
   
-      console.log("Response from server:", response);
-  
+      console.log("Response from server:", response); // Debugging
+    console.log("Response Data:", response.data); 
       if (response?.status === 403 && response?.data?.userBlocked) {
         Swal.fire({
           icon: "error",

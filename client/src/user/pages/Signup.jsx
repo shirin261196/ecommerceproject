@@ -81,6 +81,7 @@ const SignUp = () => {
       if (response.data.success) {
         toast.info('OTP resent successfully!');
         setCountdown(60);
+       
       } else {
         toast.error(response.data.message);
       }

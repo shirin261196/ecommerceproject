@@ -13,6 +13,7 @@ import {
 import { currency } from '../../App.jsx';
 import Swal from 'sweetalert2';
 import { Button, Card, Row, Col, Image, Pagination, Table, Alert } from 'react-bootstrap';
+import DownloadInvoice from '../components/Invoices.jsx';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -121,6 +122,8 @@ const OrderDetailsPage = () => {
       )}
       <p><strong>Final Price:</strong> {currency}{(order.finalPrice || 0).toFixed(2)}</p>
             <p><strong>Total Price:</strong> {currency}{totalPrice.toFixed(2)}</p>
+            <p><strong>Delivery Charge:</strong> {currency}{order.deliveryCharge.toFixed(2)}</p>
+
             <p><strong>Total Quantity:</strong> {order.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
 
             <hr />
@@ -202,6 +205,9 @@ const OrderDetailsPage = () => {
                 ))}
               </tbody>
             </Table>
+
+              {/* Download Invoice Button */}
+  <DownloadInvoice orderId={order._id} />
             <Pagination className="justify-content-center">
               {[...Array(totalPages)].map((_, index) => (
                 <Pagination.Item

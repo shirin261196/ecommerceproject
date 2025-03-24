@@ -39,8 +39,23 @@ const WishlistPage = () => {
   }, [dispatch]);
 
   const handleRemoveFromWishlist = (product) => {
-    dispatch(removeFromWishlist({ userId, productId: product.productId }));
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'Do you really want to remove this product from your wishlist?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, remove it!',
+      cancelButtonText: 'Cancel',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        dispatch(removeFromWishlist({ userId, productId: product.productId }));
+        toast.success('Product removed from wishlist');
+      }
+    });
   };
+  
 
   const handleAddToCart = (product) => {
     if (!product || !product.productId) {
@@ -144,7 +159,7 @@ const WishlistPage = () => {
                   </div>
 
                   <div className="mt-auto d-flex justify-content-between">
-                    <Link to={`/product/${product._id}`} className="btn btn-primary btn-sm">
+                    <Link to={`/product/${product.productId}`} className="btn btn-primary btn-sm">
                       View Details
                     </Link>
                     <button

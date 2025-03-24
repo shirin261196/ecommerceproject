@@ -104,14 +104,15 @@ const CartPage = () => {
 
 
 const handleApplyOffer = async () => {
-  if (appliedCoupon && appliedOffer) {
-    toast.error("You cannot apply both coupon and offer discounts simultaneously.");
+  if (appliedCoupon) {
+    toast.error("You cannot apply both a coupon and an offer at the same time.");
     return;
   }
   if (!selectedOffer) {
-    toast.error('Please select an offer.');
+    toast.error("Please select an offer.");
     return;
   }
+
 
   try {
     const response = await axios.post(
@@ -128,6 +129,7 @@ const handleApplyOffer = async () => {
       const updatedCart = response.data.cart;
       setOfferDiscount(updatedCart.discountAmount);
       dispatch(setDiscountAmount(updatedCart.discountAmount));  // Dispatch to Redux
+
       setOfferApplied(true);
 
       dispatch(fetchCart(userId)); // Update the cart in the global state
@@ -144,7 +146,7 @@ const handleApplyOffer = async () => {
   
 
   const handleCouponApply = () => {
-    if (appliedCoupon && appliedOffer) {
+    if (appliedOffer) {
       toast.error("You cannot apply both coupon and offer discounts simultaneously.");
       return;
     }
@@ -172,10 +174,25 @@ console.log('couponcode',couponCode);
       }
     })
     .catch(error => {
-      console.error('Error applying coupon:', error);
-      toast.error('Failed to apply the coupon. Please try again.');
+      console.error("Error applying coupon:", error);
+
+      // Ensure error.response exists
+      if (error.response) {
+        console.log("Error Response Data:", error.response.data);
+
+        const errorMessage = error.response.data?.message || "Failed to apply the coupon. Please try again.";
+
+        // Show toast error for minimum purchase issue
+        if (errorMessage.toLowerCase().includes("minimum purchase amount")) {
+          toast.error(errorMessage);
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        toast.error("Server error. Please try again.");
+      }
     });
-  }  
+};
   const handleRemoveOffer = async () => {
     try {
       const response = await axios.post(
@@ -313,14 +330,16 @@ console.log('couponcode',couponCode);
     }).then((result) => {
       if (result.isConfirmed) {
         dispatch(clearCart(userId))
-          .then(() => {
-            dispatch(fetchCart(userId));
-            toast.success('Cart cleared successfully!');
-          })
-          .catch((error) => {
-            console.error('Error clearing cart:', error);
-            toast.error('Failed to clear the cart.');
-          });
+        .unwrap()
+        .then(() => {
+          dispatch(fetchCart(userId));
+          toast.success('Cart cleared successfully!');
+        })
+        .catch((error) => {
+          console.error('Error clearing cart:', error);
+          toast.error('Failed to clear the cart.');
+        });
+      
       }
     });
   };

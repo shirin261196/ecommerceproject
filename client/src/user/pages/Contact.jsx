@@ -1,6 +1,7 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Container, Row, Col, Form, Button } from "react-bootstrap";
+import { toast } from "react-toastify";
 
 const Contact = () => {
   const {
@@ -12,7 +13,7 @@ const Contact = () => {
 
   const onSubmit = (data) => {
     console.log("Form Data:", data);
-    alert("Message sent successfully!");
+    toast.success("Message sent successfully!");
     reset(); // Reset form after submission
   };
 

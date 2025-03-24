@@ -8,6 +8,8 @@ import { selectUser } from '../../redux/slices/authSlice';
 import Swal from 'sweetalert2';
 import { fetchWalletBalance, selectWalletBalance } from '../../redux/slices/orderSlice';
 import { creditWallet, debitWallet } from '../../redux/slices/walletSlice';
+import axios from 'axios';
+import WalletHistory from '../components/WalletHistory.jsx';
 
 const UserProfile = () => {
   const dispatch = useDispatch();
@@ -15,7 +17,7 @@ const UserProfile = () => {
   const userProfile = useSelector(selectUserProfile);
   const addresses = useSelector(selectAddresses);
   const user = useSelector(selectUser);
-  const [walletAction, setWalletAction] = useState('');
+
 const [transactionAmount, setTransactionAmount] = useState(0);
 
   
@@ -24,6 +26,8 @@ const [transactionAmount, setTransactionAmount] = useState(0);
   const itemsPerPage = 5; // Number of addresses per page
   const [activeTab, setActiveTab] = useState('profile');
   const [showModal, setShowModal] = useState(false);
+
+  const [transactions, setTransactions] = useState([]);
   const walletBalance = useSelector(selectWalletBalance);
   const [addressForm, setAddressForm] = useState({
     _id: '',
@@ -66,19 +70,100 @@ const [transactionAmount, setTransactionAmount] = useState(0);
         Swal.fire('Error', 'Insufficient wallet balance.', 'error');
         return;
       }
-      dispatch(debitWallet({ userId: user.id, amount: transactionAmount }))
-        .unwrap()
-        .then(() => {
-          Swal.fire('Success', 'Wallet debited successfully.', 'success');
-          setTransactionAmount(0);
-        })
-        .catch((error) => {
-          Swal.fire('Error', error.message, 'error');
-        });
+  
+      // Store transaction details in localStorage or Redux
+      localStorage.setItem(
+        "walletPayment",
+        JSON.stringify({ userId: user.id, amount: transactionAmount })
+      );
+  
+      // Navigate to checkout page
+      navigate('/checkout', {
+        state: { 
+          paymentMethod: "Wallet", 
+          amount: transactionAmount 
+        }
+      });
     }
   };
   
+  
+  const handleRazorpayPayment = async () => {
+    if (!transactionAmount || transactionAmount <= 0) {
+      Swal.fire('Invalid amount', 'Please enter a valid amount.', 'error');
+      return;
+    }
+
+    try {
+      const requestBody = {
+        amount: transactionAmount,  // ✅ Make sure this is a valid number
+        userId: user.id,  // ✅ Make sure this exists
+      };
+
+
+  console.log("Sending Request:", requestBody);
+
+      // Call backend to create a Razorpay order
+      const response = await axios.post('http://localhost:4000/wallet/create-order', {
+        amount: transactionAmount,
+        userId: user.id
+      }, {
+        headers: { 'Content-Type': 'application/json' }  // ✅ Ensure JSON headers
+      });
+      
+
+      const orderData = await response.data
+
+      if (!orderData.success) {
+        throw new Error(orderData.message || 'Payment initiation failed');
+      }
+
+      const options = {
+        key: 'rzp_test_IfwKL0Uf6Xpv2h', // Replace with your Razorpay Key ID
+        amount: orderData.amount,
+        currency: 'INR',
+        name: 'KIDZCORNER',
+        description: 'Add Money to Wallet',
+        order_id: orderData.order.id,
+        handler: async (response) => {
+          // Call backend to verify payment
+          const verifyResponse = await axios.post('http://localhost:4000/wallet/verify-payment', {
+            ...response,
+            userId: user.id,
+            amount: transactionAmount
+          }, {
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const verifyData = await verifyResponse.data;
+          if (verifyData.success) {
+            dispatch(creditWallet({ userId: user.id, amount: transactionAmount }));
+            Swal.fire('Success', 'Wallet credited successfully.', 'success');
+            setTransactionAmount(0);
+          } else {
+            Swal.fire('Error', 'Payment verification failed.', 'error');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.phone || '',
+        },
+        theme: { color: '#3399cc' },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      Swal.fire('Error', error.message, 'error');
+    }
+  };
+
   const handleTabChange = (tab) => setActiveTab(tab);
+  const handleTab = (tab) => {
+    if (tab === "orders") {
+      navigate("/orders");
+    }
+  };
 
   const handleLogout = () => navigate('/login');
 
@@ -150,6 +235,7 @@ const [transactionAmount, setTransactionAmount] = useState(0);
     setCurrentPage(pageNumber);
   };
 
+
   return (
     <Container className="my-5">
       <Row>
@@ -166,7 +252,7 @@ const [transactionAmount, setTransactionAmount] = useState(0);
             <ListGroup.Item
               action
               active={activeTab === 'orders'}
-              onClick={() => handleTabChange('orders')}
+              onClick={() => handleTab('orders')}
             >
               Orders
             </ListGroup.Item>
@@ -224,6 +310,7 @@ const [transactionAmount, setTransactionAmount] = useState(0);
   <div>
     <h2>Wallet</h2>
     <p>Your wallet balance: ₹{walletBalance || 0}</p>
+    
     <Form>
       <Form.Group className="mb-3">
         <Form.Label>Transaction Amount</Form.Label>
@@ -233,13 +320,11 @@ const [transactionAmount, setTransactionAmount] = useState(0);
           onChange={(e) => setTransactionAmount(parseFloat(e.target.value))}
         />
       </Form.Group>
-      <Button
-        variant="success"
-        onClick={() => handleWalletAction('credit')}
-        className="me-2"
-      >
-        Add Money
+      
+      <Button variant="success" onClick={handleRazorpayPayment} className="me-2">
+        Add Money via Razorpay
       </Button>
+      
       <Button
         variant="danger"
         onClick={() => handleWalletAction('debit')}
@@ -248,6 +333,8 @@ const [transactionAmount, setTransactionAmount] = useState(0);
         Spend Money
       </Button>
     </Form>
+<WalletHistory/>
+  
   </div>
 )}
 
