@@ -89,11 +89,18 @@ import order_icon from './order_icon.png'
 import upload_area from './upload_area.png'
 import parcel_icon from './parcel_icon.svg'
 import wishlist_icon from './wishlist_icon.png'
-
-
+import babyhug_logo from './babyhug_logo.png'
+import hm_logo from './H-&-M-logo-01.png'
+import hopscotch_logo from './hopscotch.jpeg'
+import boyfashion from './boyfashion.jpg'
+import girlfashion from './girlsfashion.webp'
 
 
 export const assets = {
+    babyhug_logo,
+    hm_logo,
+    hopscotch_logo,
+    boyfashion,girlfashion,
     add_icon,
     order_icon,
     upload_area,
