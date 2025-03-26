@@ -1,4 +1,5 @@
 {
+  "homepage": "https://shirin261196.github.io/ecommerceproject/",
   "name": "frontend",
   "private": true,
   "version": "0.0.0",
@@ -7,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+      "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.4.0",
